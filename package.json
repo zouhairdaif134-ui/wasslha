@@ -1,0 +1,13 @@
+{
+"name": "wasslha",
+"version": "0.1.0",
+"private": true,
+"description": "WASSLHA — Local Delivery & Commerce Platform for Berrechid",
+"packageManager": "pnpm@10.0.0",
+"scripts": {
+"dev": "pnpm -r dev",
+"build": "pnpm -r build",
+"test": "pnpm -r test",
+"lint": "pnpm -r lint"
+}
+}
