@@ -1,0 +1,11 @@
+{
+"name": "@wasslha/api",
+"version": "0.1.0",
+"private": true,
+"description": "WASSLHA Backend API",
+"scripts": {
+"dev": "wrangler dev",
+"deploy": "wrangler deploy",
+"test": "vitest"
+}
+}
