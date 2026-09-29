@@ -1,14 +1,7 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
-
-function App() {
-return (
-<div>
-<h1>WASSLHA Merchant</h1>
-<p>Merchant Dashboard foundation — Development</p>
-</div>
-);
-}
+import App from "./App";
+import "./index.css";
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
 <React.StrictMode>
