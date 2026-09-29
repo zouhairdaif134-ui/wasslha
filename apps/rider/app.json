@@ -1,0 +1,13 @@
+{
+"expo": {
+"name": "WASSLHA Rider",
+"slug": "wasslha-rider",
+"version": "0.1.0",
+"orientation": "portrait",
+"userInterfaceStyle": "automatic",
+"scheme": "wasslha-rider",
+"android": {
+"package": "ma.wasslha.rider"
+}
+}
+}
