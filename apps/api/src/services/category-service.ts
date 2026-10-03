@@ -17,13 +17,12 @@ export interface CategoryServiceEnv
 
 export interface Category {
   id: string;
-  name?: string | null;
-  name_ar?: string | null;
-  name_fr?: string | null;
-  description?: string | null;
-  image_url?: string | null;
-  is_active?: boolean;
-  sort_order?: number;
+  parent_id?: string | null;
+  name_ar: string;
+  name_fr: string;
+  slug: string;
+  is_active: boolean;
+  sort_order: number;
   created_at?: string;
   updated_at?: string;
 }
