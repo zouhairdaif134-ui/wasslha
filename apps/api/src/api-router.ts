@@ -69,7 +69,11 @@ export async function routeApi(request:Request,env:unknown,requestId:string):Pro
   if(p[0]==="notifications"&&m==="PATCH"&&id&&p[2]==="read")return ok(await markNotificationAsRead(id,uid,env as any,token),requestId);
   if(p[0]==="notifications"&&m==="GET")return ok(await getUserNotifications(uid,env as any,token),requestId);
 
-  if(p[0]==="finance"&&id==="settlements"&&m==="GET")return ok(await getMerchantSettlements(uid,env as any,token),requestId);
+  if(p[0]==="finance"&&id==="settlements"&&m==="GET"){
+   const merchant=await getMerchantByOwner(uid,env as any,token);
+   if(!merchant.data)return ok([],requestId);
+   return ok(await getMerchantSettlements(merchant.data.id,env as any,token),requestId);
+  }
   if(p[0]==="promotions"&&m==="GET")return ok(await getActivePromotions(env as any,token),requestId);
   if(p[0]==="promo-codes"&&m==="GET"&&id)return ok(await getPromoCode(id,env as any,token),requestId);
   if(p[0]==="loyalty"&&id==="me"&&m==="GET")return ok(await getLoyaltyAccount(uid,env as any,token),requestId);
