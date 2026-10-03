@@ -3,8 +3,7 @@
  * Backend Idempotency Helpers
  *
  * Prevents accidental duplicate processing of sensitive API operations.
- * The actual persistence and enforcement will be handled by the database
- * and service layer when those modules are connected.
+ * The persistence layer will be connected through the service layer.
  *
  * Berrechid MVP.
  */
@@ -12,6 +11,10 @@
 import {
   badRequest,
 } from "./errors";
+
+import {
+  hashJson,
+} from "./hash";
 
 const IDEMPOTENCY_KEY_HEADER =
   "Idempotency-Key";
@@ -98,6 +101,12 @@ export function isIdempotencyRequiredMethod(
   );
 }
 
+export async function createRequestHash(
+  body: unknown,
+): Promise<string> {
+  return hashJson(body);
+}
+
 export function getIdempotencyKeyHeaderName(): string {
   return IDEMPOTENCY_KEY_HEADER;
-    }
+}
