@@ -1,13 +1,14 @@
 /**
  * WASSLHA API
- * Backend Core — API Foundation + Authentication Middleware
+ * Backend Core — Authentication + RBAC
  * Berrechid MVP
  */
 
 import {
-  authenticateRequest,
-  type AuthUser,
-} from "./lib/auth";
+  createRequestContext,
+  isAuthenticated,
+  type RequestContext,
+} from "./lib/request-context";
 
 export interface Env {
   ENVIRONMENT: string;
@@ -78,6 +79,22 @@ function unauthorized(
   );
 }
 
+function forbidden(
+  requestId: string,
+  message = "Access denied",
+): Response {
+  return json(
+    {
+      error: {
+        code: "FORBIDDEN",
+        message,
+      },
+    },
+    403,
+    requestId,
+  );
+}
+
 function notFound(requestId: string): Response {
   return json(
     {
@@ -115,19 +132,24 @@ function methodNotAllowed(
   });
 }
 
-function authenticatedUserResponse(
-  user: AuthUser,
+function authMeResponse(
+  context: RequestContext,
   requestId: string,
 ): Response {
   return json(
     {
       data: {
         user: {
-          id: user.id,
-          email: user.email ?? null,
-          phone: user.phone ?? null,
-          user_metadata: user.user_metadata ?? {},
+          id: context.user?.id ?? null,
+          email: context.user?.email ?? null,
+          phone: context.user?.phone ?? null,
+          user_metadata:
+            context.user?.user_metadata ?? {},
         },
+        roles: context.roles.map((role) => ({
+          id: role.id,
+          name: role.name,
+        })),
       },
     },
     200,
@@ -147,9 +169,15 @@ async function handleApiRequest(
   /*
    * Public API root
    */
-  if (path === API_PREFIX || path === `${API_PREFIX}/`) {
+  if (
+    path === API_PREFIX ||
+    path === `${API_PREFIX}/`
+  ) {
     if (method !== "GET") {
-      return methodNotAllowed(requestId, ["GET"]);
+      return methodNotAllowed(
+        requestId,
+        ["GET"],
+      );
     }
 
     return json(
@@ -169,7 +197,10 @@ async function handleApiRequest(
    */
   if (path === `${API_PREFIX}/health`) {
     if (method !== "GET") {
-      return methodNotAllowed(requestId, ["GET"]);
+      return methodNotAllowed(
+        requestId,
+        ["GET"],
+      );
     }
 
     return json(
@@ -178,7 +209,8 @@ async function handleApiRequest(
         service: "wasslha-api",
         version: "v1",
         environment: env.ENVIRONMENT,
-        timestamp: new Date().toISOString(),
+        timestamp:
+          new Date().toISOString(),
         request_id: requestId,
       },
       200,
@@ -191,7 +223,10 @@ async function handleApiRequest(
    */
   if (path === `${API_PREFIX}/ready`) {
     if (method !== "GET") {
-      return methodNotAllowed(requestId, ["GET"]);
+      return methodNotAllowed(
+        requestId,
+        ["GET"],
+      );
     }
 
     const supabaseConfigured =
@@ -200,7 +235,9 @@ async function handleApiRequest(
 
     return json(
       {
-        status: supabaseConfigured ? "ready" : "degraded",
+        status: supabaseConfigured
+          ? "ready"
+          : "degraded",
         service: "wasslha-api",
         checks: {
           api: "ok",
@@ -208,59 +245,80 @@ async function handleApiRequest(
             ? "configured"
             : "not_configured",
         },
-        timestamp: new Date().toISOString(),
+        timestamp:
+          new Date().toISOString(),
         request_id: requestId,
       },
-      supabaseConfigured ? 200 : 503,
+      supabaseConfigured
+        ? 200
+        : 503,
       requestId,
     );
   }
 
   /*
-   * Authentication routes
+   * Authentication + RBAC
    */
   if (path === `${API_PREFIX}/auth/me`) {
     if (method !== "GET") {
-      return methodNotAllowed(requestId, ["GET"]);
-    }
-
-    const auth = await authenticateRequest(request, env);
-
-    if (!auth.authenticated || !auth.user) {
-      return unauthorized(
+      return methodNotAllowed(
         requestId,
-        auth.error || "Authentication required",
+        ["GET"],
       );
     }
 
-    return authenticatedUserResponse(
-      auth.user,
+    const context =
+      await createRequestContext(
+        request,
+        env,
+      );
+
+    if (!isAuthenticated(context)) {
+      return unauthorized(
+        requestId,
+        context.error ||
+          "Authentication required",
+      );
+    }
+
+    return authMeResponse(
+      context,
       requestId,
     );
   }
 
   /*
-   * Protected API namespace.
+   * Future protected API routes.
    *
-   * All future authenticated application routes
-   * will pass through this authentication boundary.
+   * Authentication and RBAC will be resolved
+   * before module-specific authorization.
    */
-  if (path.startsWith(`${API_PREFIX}/`)) {
-    const auth = await authenticateRequest(request, env);
+  if (
+    path.startsWith(
+      `${API_PREFIX}/`,
+    )
+  ) {
+    const context =
+      await createRequestContext(
+        request,
+        env,
+      );
 
-    if (!auth.authenticated || !auth.user) {
+    if (!isAuthenticated(context)) {
       return unauthorized(
         requestId,
-        auth.error || "Authentication required",
+        context.error ||
+          "Authentication required",
       );
     }
 
-    /*
-     * Authentication is valid.
-     *
-     * RBAC, permissions and module-specific handlers
-     * will be added here in the next backend stages.
-     */
+    if (context.error) {
+      return forbidden(
+        requestId,
+        context.error,
+      );
+    }
+
     return notFound(requestId);
   }
 
@@ -272,41 +330,53 @@ export default {
     request: Request,
     env: Env,
   ): Promise<Response> {
-    const requestId = getRequestId(request);
+    const requestId =
+      getRequestId(request);
 
     try {
-      if (request.method.toUpperCase() === "OPTIONS") {
+      if (
+        request.method.toUpperCase() ===
+        "OPTIONS"
+      ) {
         return withCors(
           new Response(null, {
             status: 204,
             headers: {
-              "X-Request-ID": requestId,
+              "X-Request-ID":
+                requestId,
             },
           }),
         );
       }
 
-      const response = await handleApiRequest(
-        request,
-        env,
-        requestId,
-      );
+      const response =
+        await handleApiRequest(
+          request,
+          env,
+          requestId,
+        );
 
       return withCors(response);
     } catch (error) {
-      console.error("Unhandled API error", {
-        requestId,
-        error,
-      });
+      console.error(
+        "Unhandled API error",
+        {
+          requestId,
+          error,
+        },
+      );
 
       return withCors(
         json(
           {
             error: {
-              code: "INTERNAL_SERVER_ERROR",
-              message: "An unexpected error occurred",
+              code:
+                "INTERNAL_SERVER_ERROR",
+              message:
+                "An unexpected error occurred",
             },
-            request_id: requestId,
+            request_id:
+              requestId,
           },
           500,
           requestId,
@@ -315,4 +385,3 @@ export default {
     }
   },
 };
-
