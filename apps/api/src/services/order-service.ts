@@ -22,8 +22,10 @@ export interface MasterOrder {
   id: string;
   customer_id: string;
   status?: string | null;
-  total_amount_minor?: number | null;
+  subtotal_minor?: number | null;
+  discount_minor?: number | null;
   delivery_fee_minor?: number | null;
+  total_minor?: number | null;
   currency?: string | null;
   delivery_address_id?: string | null;
   created_at?: string;
@@ -158,8 +160,11 @@ export async function getOrderStatusHistory(
     Array<{
       id: string;
       master_order_id: string;
-      status?: string | null;
-      note?: string | null;
+      old_status?: string | null;
+      new_status?: string | null;
+      changed_by?: string | null;
+      reason?: string | null;
+      metadata?: Record<string, unknown>;
       created_at?: string;
     }>
   >
