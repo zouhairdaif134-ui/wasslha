@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import {
   getAdminAudit,getAdminFinance,getAdminMerchants,getAdminOrders,getAdminRiders,getAdminSupport,getAdminUsers,
   type AdminAuditRow,type AdminComplaintRow,type AdminLedgerRow,type AdminMerchantRow,type AdminOrderRow,
@@ -11,7 +11,7 @@ type Props={module:string};
 function money(v:number|string){const n=Number(v);return Number.isFinite(n)?(n/100).toLocaleString("fr-MA",{minimumFractionDigits:2,maximumFractionDigits:2})+" MAD":"—";}
 function date(v:string|null){return v?new Date(v).toLocaleString("fr-MA",{dateStyle:"short",timeStyle:"short"}):"—";}
 function Badge({children}:{children:string}){return <span className={"data-badge "+children.toLowerCase().replace(/[^a-z0-9]+/g,"-")}>{children}</span>;}
-function Table({headers,children}:{headers:string[];children:React.ReactNode}){return <div className="data-table-wrap"><table className="data-table"><thead><tr>{headers.map(h=><th key={h}>{h}</th>)}</tr></thead><tbody>{children}</tbody></table></div>;}
+function Table({headers,children}:{headers:string[];children:ReactNode}){return <div className="data-table-wrap"><table className="data-table"><thead><tr>{headers.map(h=><th key={h}>{h}</th>)}</tr></thead><tbody>{children}</tbody></table></div>;}
 function ErrorBox({message}:{message:string}){return <div className="auth-error overview-error">{message}</div>;}
 
 export default function AdminModule({module}:Props){
