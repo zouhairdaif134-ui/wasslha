@@ -21,6 +21,7 @@ import { authorize } from "./lib/authorization";
 import { PERMISSIONS } from "./lib/permissions";
 import { getAdminDashboardOverview } from "./services/admin-dashboard-service";
 import { getAdminOrders, getAdminMerchants, getAdminRiders, getAdminFinance, getAdminSupport, getAdminUsers, getAdminAudit } from "./services/admin-operational-service";
+import { getMerchantDashboard } from "./services/merchant-dashboard-service";
 
 
 function tokenOf(request:Request){const value=request.headers.get("Authorization")??"";return value.startsWith("Bearer ")?value.slice(7):""}
@@ -105,6 +106,12 @@ export async function routeApi(request:Request,env:unknown,requestId:string):Pro
   if(p[0]==="stores"&&m==="GET"&&id)return ok(await getStore(id,env as any,token),requestId);
   if(p[0]==="merchants"&&m==="GET"&&id)return ok(await getMerchant(id,env as any,token),requestId);
   if(p[0]==="merchant"&&id==="me"&&m==="GET")return ok(await getMerchantByOwner(uid,env as any,token),requestId);
+ if(p[0]==="merchant"&&id==="me"&&p[2]==="dashboard"&&m==="GET"){
+   const decision=authorize(context,PERMISSIONS.MERCHANT_DASHBOARD_VIEW); if(!decision.allowed)return fail("FORBIDDEN",decision.reason??"Permission denied",403,requestId);
+   const merchant=await getMerchantByOwner(uid,env as any,token); if(!merchant.data)return fail("MERCHANT_NOT_FOUND","Merchant account not found",404,requestId);
+   return ok(await getMerchantDashboard(merchant.data.id,env as any,token),requestId);
+  }
+
 
   if(p[0]==="orders"&&m==="GET"&&id&&p[2]==="suborders")return ok(await getOrderSubOrders(id,env as any,token),requestId);
   if(p[0]==="orders"&&m==="GET"&&id&&p[2]==="history")return ok(await getOrderStatusHistory(id,env as any,token),requestId);
