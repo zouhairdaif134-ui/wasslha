@@ -12,8 +12,13 @@ import {
   databaseGet,
   type DatabaseEnv,
 } from "../lib/database";
+import {
+  servicePost,
+  servicePatch,
+  type ServiceAuthEnv,
+} from "../lib/service-client";
 
-export interface DeliveryServiceEnv extends DatabaseEnv {}
+export interface DeliveryServiceEnv extends DatabaseEnv, ServiceAuthEnv {}
 
 export interface Delivery {
   id: string;
@@ -151,4 +156,69 @@ export async function getDeliveryAssignments(
     data: result.data ?? [],
     error: null,
   };
+}
+
+
+export type DeliveryAssignmentStatus =
+  | "offered"
+  | "accepted"
+  | "rejected"
+  | "cancelled"
+  | "completed";
+
+export async function offerDeliveryToRider(
+  deliveryId: string,
+  riderId: string,
+  assignedBy: string,
+  env: DeliveryServiceEnv,
+): Promise<DeliveryServiceResult<DeliveryAssignment | null>> {
+  const result = await servicePost<DeliveryAssignment[]>(
+    "/rest/v1/delivery_assignments",
+    env,
+    {
+      delivery_id: deliveryId,
+      rider_id: riderId,
+      assigned_by: assignedBy,
+      status: "offered",
+    },
+  );
+
+  if (result.error) {
+    return { success: false, data: null, error: result.error };
+  }
+
+  return { success: true, data: result.data?.[0] ?? null, error: null };
+}
+
+export async function updateDeliveryAssignmentStatus(
+  assignmentId: string,
+  status: DeliveryAssignmentStatus,
+  env: DeliveryServiceEnv,
+  rejectionReason?: string,
+): Promise<DeliveryServiceResult<DeliveryAssignment | null>> {
+  const body: Record<string, unknown> = {
+    status,
+    responded_at:
+      status === "accepted" || status === "rejected"
+        ? new Date().toISOString()
+        : undefined,
+    completed_at:
+      status === "completed" ? new Date().toISOString() : undefined,
+  };
+
+  if (status === "rejected" && rejectionReason) {
+    body.rejection_reason = rejectionReason;
+  }
+
+  const result = await servicePatch<DeliveryAssignment[]>(
+    `/rest/v1/delivery_assignments?id=eq.${encodeURIComponent(assignmentId)}`,
+    env,
+    body,
+  );
+
+  if (result.error) {
+    return { success: false, data: null, error: result.error };
+  }
+
+  return { success: true, data: result.data?.[0] ?? null, error: null };
 }
