@@ -20,6 +20,7 @@ import { getAuthenticatedSession } from "./services/auth-service";
 import { authorize } from "./lib/authorization";
 import { PERMISSIONS } from "./lib/permissions";
 import { getAdminDashboardOverview } from "./services/admin-dashboard-service";
+import { getAdminOrders, getAdminMerchants, getAdminRiders, getAdminFinance, getAdminSupport, getAdminUsers, getAdminAudit } from "./services/admin-operational-service";
 
 
 function tokenOf(request:Request){const value=request.headers.get("Authorization")??"";return value.startsWith("Bearer ")?value.slice(7):""}
@@ -42,6 +43,42 @@ export async function routeApi(request:Request,env:unknown,requestId:string):Pro
  if(!isAuthenticated(context))return fail("UNAUTHORIZED",context.error??"Authentication required",401,requestId);
  const token=tokenOf(request),uid=context.user!.id;
  const p=u.pathname.replace(/^\/api\/v1\/?/,"").split("/").filter(Boolean),m=request.method.toUpperCase(),id=p[1];
+
+ if(p[0]==="admin"&&p[1]==="orders"&&m==="GET"){
+  const decision=authorize(context,PERMISSIONS.ADMIN_ORDERS_READ); if(!decision.allowed)return fail("FORBIDDEN",decision.reason??"Permission denied",403,requestId);
+  const result=await getAdminOrders(uid,u.searchParams.get("status"),Number(u.searchParams.get("limit")??50),Number(u.searchParams.get("offset")??0),env as any);
+  if(result.error)return fail("ADMIN_ORDERS_ERROR",result.error,502,requestId); return ok(result.data,requestId);
+ }
+ if(p[0]==="admin"&&p[1]==="merchants"&&m==="GET"){
+  const decision=authorize(context,PERMISSIONS.ADMIN_MERCHANTS_READ); if(!decision.allowed)return fail("FORBIDDEN",decision.reason??"Permission denied",403,requestId);
+  const result=await getAdminMerchants(uid,u.searchParams.get("status"),Number(u.searchParams.get("limit")??50),Number(u.searchParams.get("offset")??0),env as any);
+  if(result.error)return fail("ADMIN_MERCHANTS_ERROR",result.error,502,requestId); return ok(result.data,requestId);
+ }
+ if(p[0]==="admin"&&p[1]==="riders"&&m==="GET"){
+  const decision=authorize(context,PERMISSIONS.ADMIN_RIDERS_READ); if(!decision.allowed)return fail("FORBIDDEN",decision.reason??"Permission denied",403,requestId);
+  const result=await getAdminRiders(uid,u.searchParams.get("status"),Number(u.searchParams.get("limit")??50),Number(u.searchParams.get("offset")??0),env as any);
+  if(result.error)return fail("ADMIN_RIDERS_ERROR",result.error,502,requestId); return ok(result.data,requestId);
+ }
+ if(p[0]==="admin"&&p[1]==="finance"&&m==="GET"){
+  const decision=authorize(context,PERMISSIONS.ADMIN_FINANCE_READ); if(!decision.allowed)return fail("FORBIDDEN",decision.reason??"Permission denied",403,requestId);
+  const result=await getAdminFinance(uid,u.searchParams.get("kind")??"payments",Number(u.searchParams.get("limit")??50),Number(u.searchParams.get("offset")??0),env as any);
+  if(result.error)return fail("ADMIN_FINANCE_ERROR",result.error,502,requestId); return ok(result.data,requestId);
+ }
+ if(p[0]==="admin"&&p[1]==="support"&&m==="GET"){
+  const decision=authorize(context,PERMISSIONS.ADMIN_SUPPORT_READ); if(!decision.allowed)return fail("FORBIDDEN",decision.reason??"Permission denied",403,requestId);
+  const result=await getAdminSupport(uid,u.searchParams.get("kind")??"tickets",Number(u.searchParams.get("limit")??50),Number(u.searchParams.get("offset")??0),env as any);
+  if(result.error)return fail("ADMIN_SUPPORT_ERROR",result.error,502,requestId); return ok(result.data,requestId);
+ }
+ if(p[0]==="admin"&&p[1]==="users"&&m==="GET"){
+  const decision=authorize(context,PERMISSIONS.ADMIN_USERS_READ); if(!decision.allowed)return fail("FORBIDDEN",decision.reason??"Permission denied",403,requestId);
+  const result=await getAdminUsers(uid,Number(u.searchParams.get("limit")??50),Number(u.searchParams.get("offset")??0),env as any);
+  if(result.error)return fail("ADMIN_USERS_ERROR",result.error,502,requestId); return ok(result.data,requestId);
+ }
+ if(p[0]==="admin"&&p[1]==="audit"&&m==="GET"){
+  const decision=authorize(context,PERMISSIONS.ADMIN_AUDIT_READ); if(!decision.allowed)return fail("FORBIDDEN",decision.reason??"Permission denied",403,requestId);
+  const result=await getAdminAudit(uid,Number(u.searchParams.get("limit")??100),Number(u.searchParams.get("offset")??0),env as any);
+  if(result.error)return fail("ADMIN_AUDIT_ERROR",result.error,502,requestId); return ok(result.data,requestId);
+ }
 
  if(p[0]==="admin"&&p[1]==="overview"&&m==="GET"){
   const decision=authorize(context,PERMISSIONS.ADMIN_DASHBOARD_VIEW);
