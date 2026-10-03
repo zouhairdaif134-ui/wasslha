@@ -330,7 +330,11 @@ using (
         select 1
         from public.sub_orders so
         join public.merchants m
-            on m.id = so.merchant_id
+            on m.id = (
+                select s.merchant_id
+                from public.stores s
+                where s.id = so.store_id
+            )
         where so.master_order_id = conversations.master_order_id
           and m.user_id = auth.uid()
     )
@@ -342,7 +346,7 @@ using (
         join public.riders r
             on r.id = da.rider_id
         where d.master_order_id = conversations.master_order_id
-          and r.user_id = auth.uid()
+          and r.id = auth.uid()
     )
 );
 
@@ -391,7 +395,7 @@ using (
                   join public.riders r
                       on r.id = da.rider_id
                   where d.master_order_id = c.master_order_id
-                    and r.user_id = auth.uid()
+                    and r.id = auth.uid()
               )
           )
     )
