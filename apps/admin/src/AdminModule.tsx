@@ -1,6 +1,6 @@
 import { useEffect, useState, type ReactNode } from "react";
 import {
-  getAdminAudit,getAdminFinance,getAdminMerchants,getAdminOrders,getAdminRiders,getAdminSupport,getAdminUsers,
+  getAdminAudit,getAdminFinance,getAdminGovernanceOverview,getAdminMerchants,getAdminOrders,getAdminRiders,getAdminSupport,getAdminUsers,
   type AdminAuditRow,type AdminComplaintRow,type AdminLedgerRow,type AdminMerchantRow,type AdminOrderRow,
   type AdminPaymentRow,type AdminRiderRow,type AdminSettlementRow,type AdminTicketRow,type AdminUserRow
 } from "./lib/api";
@@ -25,7 +25,7 @@ export default function AdminModule({module}:Props){
  else if(module==="reports")d=await getAdminFinance(s.access_token,"ledger");
  else if(module==="support")d=await getAdminSupport(s.access_token,"tickets");
  else if(module==="users")d=await getAdminUsers(s.access_token);
- else if(module==="settings")d=await getAdminAudit(s.access_token);
+ else if(module==="settings")d=await getAdminGovernanceOverview(s.access_token);
  else d={items:[],total:0};
  if(alive)setData(d);
  }catch(e){if(alive)setError(e instanceof Error?e.message:"Unable to load module.");}finally{if(alive)setLoading(false);}})();return()=>{alive=false}},[module]);
@@ -40,6 +40,7 @@ export default function AdminModule({module}:Props){
  if(module==="reports")return <section className="module-workspace"><ModuleHead title="Financial Ledger" total={total}/><Table headers={["Type","Direction","Amount","Order","Reference","Date"]}>{(rows as AdminLedgerRow[]).map(r=><tr key={r.id}><td>{r.entry_type}</td><td><Badge>{r.direction}</Badge></td><td>{money(r.amount_minor)}</td><td>{r.master_order_id??"—"}</td><td>{r.reference_type??"—"}</td><td>{date(r.created_at)}</td></tr>)}</Table></section>;
  if(module==="support")return <section className="module-workspace"><ModuleHead title="الدعم والشكايات" total={total}/><Table headers={["الموضوع","الزبون","الأولوية","الحالة","الطلب","التاريخ"]}>{(rows as AdminTicketRow[]).map(r=><tr key={r.id}><td><b>{r.subject}</b><small>{r.category}</small></td><td>{r.user_name??"—"}</td><td><Badge>{r.priority}</Badge></td><td><Badge>{r.status}</Badge></td><td>{r.order_number??"—"}</td><td>{date(r.created_at)}</td></tr>)}</Table></section>;
  if(module==="users")return <section className="module-workspace"><ModuleHead title="المستخدمون" total={total}/><Table headers={["المستخدم","الهاتف","الأدوار","اللغة","الحالة","التاريخ"]}>{(rows as AdminUserRow[]).map(r=><tr key={r.id}><td><b>{r.full_name??"—"}</b><small>{r.id}</small></td><td>{r.phone??"—"}</td><td>{r.roles.map(x=>x.name).join(" · ")}</td><td>{r.preferred_language}</td><td>{r.is_active?"Active":"Disabled"}</td><td>{date(r.created_at)}</td></tr>)}</Table></section>;
+ if(module==="settings"){const g=data as {settings:number;sensitive_settings:number;open_risk_flags:number;critical_risk_flags:number;active_app_versions:number;latest_releases:number;setting_changes_today:number};return <section className="module-workspace"><ModuleHead title="الحوكمة والإعدادات" total={g.settings}/><div className="cards"><article><span>Settings</span><b>{g.settings}</b><small>{g.sensitive_settings} sensitive</small></article><article><span>Risk Flags</span><b>{g.open_risk_flags}</b><small>{g.critical_risk_flags} critical</small></article><article><span>App Versions</span><b>{g.active_app_versions}</b><small>{g.latest_releases} latest</small></article><article><span>Changes Today</span><b>{g.setting_changes_today}</b><small>append-only history</small></article></div><div className="panel"><h3>Governance policy</h3><p>الإعدادات الحساسة ما كتبدلش من الواجهة مباشرة. أي mutation خاصو backend authorization + reason + before/after history + audit trail.</p></div></section>;}
  return <section className="module-workspace"><ModuleHead title="Audit Log" total={total}/><Table headers={["Actor","Action","Entity","IP","Date"]}>{(rows as AdminAuditRow[]).map(r=><tr key={r.id}><td>{r.actor_name??"System"}</td><td><b>{r.action}</b></td><td>{r.entity_type} {r.entity_id??""}</td><td>{r.ip_address??"—"}</td><td>{date(r.created_at)}</td></tr>)}</Table></section>;
 }
 function ModuleHead({title,total}:{title:string;total:number}){return <div className="module-workspace-head"><div><span className="section-kicker">LIVE DATA · API v1</span><h2>{title}</h2></div><strong>{total.toLocaleString()} records</strong></div>}
