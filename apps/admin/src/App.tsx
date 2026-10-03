@@ -420,18 +420,12 @@ function Dashboard({ adminSession }: { adminSession: AdminSession }) {
             </section>
           </>
         ) : (
-          <section className="module-page">
-            <div className="module-page-icon">W</div>
-            <span className="section-kicker">ADMIN MODULE</span>
-            <h2>{activeLabel}</h2>
-            <p>
-              الوحدة محمية بالـ Admin session. قبل إضافة أي mutation، غادي
-              نربطها بالـ API endpoint والـ permission والـ audit trail ديالها.
-            </p>
-            <button className="back-button" type="button" onClick={() => setActive("overview")}>
+          <>
+            <AdminModule module={active} />
+            <button className="back-button workspace-back" type="button" onClick={() => setActive("overview")}>
               رجوع للـ Overview
             </button>
-          </section>
+          </>
         )}
       </main>
     </div>
