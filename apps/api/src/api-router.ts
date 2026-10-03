@@ -16,6 +16,10 @@ import { getActivePromotions,getPromoCode,getLoyaltyAccount,getUserReferrals } f
 import { getMyTickets,getMyComplaints,getPublishedReviews,getReviewReplies } from "./services/support-service";
 import { getMyRequests,getRequest,getRequestItems,getRequestOffers } from "./services/get-request-service";
 import { getMessages,getConversations,getNotificationPreferences } from "./services/communication-service";
+import { getAuthenticatedSession } from "./services/auth-service";
+import { authorize } from "./lib/authorization";
+import { PERMISSIONS } from "./lib/permissions";
+
 
 function tokenOf(request:Request){const value=request.headers.get("Authorization")??"";return value.startsWith("Bearer ")?value.slice(7):""}
 function ok<T>(data:T,requestId:string){return successResponse(data,{requestId})}
@@ -36,6 +40,18 @@ export async function routeApi(request:Request,env:unknown,requestId:string):Pro
  const context=await createRequestContext(request,env as Parameters<typeof createRequestContext>[1]);
  if(!isAuthenticated(context))return fail("UNAUTHORIZED",context.error??"Authentication required",401,requestId);
  const token=tokenOf(request),uid=context.user!.id;
+
+ if(p[0]==="auth"&&p[1]==="me"&&m==="GET"){
+  const session=await getAuthenticatedSession(request,env as any);
+  if(!session.success||!session.session)return fail("UNAUTHORIZED",session.error??"Authentication required",401,requestId);
+  const decision=authorize(context,PERMISSIONS.ADMIN_DASHBOARD_VIEW);
+  if(!decision.allowed)return fail("FORBIDDEN",decision.reason??"Permission denied",403,requestId);
+  return ok({
+   user:session.session.user,
+   roles:session.session.roles,
+   admin:true,
+  },requestId);
+ }
  const p=u.pathname.replace(/^\/api\/v1\/?/,"").split("/").filter(Boolean),m=request.method.toUpperCase(),id=p[1];
  try{
   if(p[0]==="categories"&&m==="GET")return ok(await getCategories(env as any,token),requestId);
