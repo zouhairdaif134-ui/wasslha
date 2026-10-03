@@ -1,41 +1,61 @@
 WASSLHA Architecture
 
-Overview
+## Connected Application Architecture
 
-WASSLHA uses a monorepo architecture for the Berrechid MVP.
+WASSLHA uses a backend-centered connected application model for the Berrechid MVP.
 
-Main Components
+Customer App, Rider App, Merchant Dashboard and Admin Dashboard do not communicate directly with each other for business operations. They communicate through the versioned Cloudflare Workers API, which uses Supabase/PostgreSQL as the authoritative system of record.
+
+```text
+Customer App ─────┐
+Merchant Dashboard ┼──► Cloudflare API ───► Supabase/PostgreSQL
+Rider App ────────┤          │                    │
+Admin Dashboard ──┘          ├──► Maps Service    ├── Auth
+                             ├──► Notifications   ├── RLS
+                             └──► Jobs/Webhooks    └── Storage
+```
+
+## System Components
 
 - GitHub — source control and repository
 - Supabase — PostgreSQL, Auth, RLS and Storage
 - Cloudflare Workers — Backend API and webhooks
 - Cloudflare Pages — Admin and Merchant dashboards
 - React Native + Expo — Customer and Rider mobile apps
-- Google Maps Platform — GPS, routes, distance and ETA
+- Google Maps Platform — GPS, routes, distance and ETA through the backend Maps service layer
 - Telegram — operational notifications and alerts
 
-Applications
+## Canonical Order Flow
 
-- Customer Mobile App
-- Rider Mobile App
-- Merchant Dashboard
-- Admin Dashboard
-- Backend API
+Customer → Merchant → Rider → Pickup → Delivery → Payment → Commission → Rider Earnings → Merchant Settlement
 
-Environments
+The API owns authentication context, authorization, backend validation, business rules, order state transitions, sensitive operations and integration orchestration. PostgreSQL RLS remains authoritative after API authorization.
 
-The system uses three isolated environments:
+## Application Responsibilities
 
-1. Development
-2. Staging
-3. Production
+### Customer App
+Marketplace discovery, addresses/location, ordering, payment, tracking, wallet/growth and support.
 
-Production data and credentials must never be mixed with development or staging.
+### Merchant Dashboard
+Merchant/store/product operations, order handling and preparation, earnings and settlement visibility.
 
-Architecture Principle
+### Rider App
+Availability, slots/waiting list, assignments, navigation, pickup/delivery, controlled live location and earnings.
 
-The backend is the authoritative layer for business rules, validation, security-sensitive operations and financial operations.
+### Admin Dashboard
+Operations, users, merchants, riders, finance, support, reports, governance/settings and audit visibility according to granular permissions.
 
-Database access must respect PostgreSQL RLS.
+## Security and Reliability
 
-Financial and audit records must never be physically deleted.
+- Service-role credentials never reach clients.
+- Sensitive operations require idempotency.
+- Order status changes use the authoritative state machine.
+- Financial records use integer minor units in MAD and reversal/adjustment semantics rather than destructive deletion.
+- Audit records are append-only.
+- Live rider location is limited to active service and controlled retention.
+- External providers are integrations, not sources of truth.
+- Development, Staging and Production are isolated.
+
+## Architectural Decision
+
+See docs/decisions/ADR-009-connected-application-architecture.md for the detailed connected-system contract and acceptance criteria.
