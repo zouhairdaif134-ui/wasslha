@@ -19,6 +19,7 @@ import { getMessages,getConversations,getNotificationPreferences } from "./servi
 import { getAuthenticatedSession } from "./services/auth-service";
 import { authorize } from "./lib/authorization";
 import { PERMISSIONS } from "./lib/permissions";
+import { getAdminDashboardOverview } from "./services/admin-dashboard-service";
 
 
 function tokenOf(request:Request){const value=request.headers.get("Authorization")??"";return value.startsWith("Bearer ")?value.slice(7):""}
@@ -41,6 +42,14 @@ export async function routeApi(request:Request,env:unknown,requestId:string):Pro
  if(!isAuthenticated(context))return fail("UNAUTHORIZED",context.error??"Authentication required",401,requestId);
  const token=tokenOf(request),uid=context.user!.id;
  const p=u.pathname.replace(/^\/api\/v1\/?/,"").split("/").filter(Boolean),m=request.method.toUpperCase(),id=p[1];
+
+ if(p[0]==="admin"&&p[1]==="overview"&&m==="GET"){
+  const decision=authorize(context,PERMISSIONS.ADMIN_DASHBOARD_VIEW);
+  if(!decision.allowed)return fail("FORBIDDEN",decision.reason??"Permission denied",403,requestId);
+  const result=await getAdminDashboardOverview(uid,env as any);
+  if(result.error)return fail("ADMIN_DASHBOARD_ERROR",result.error,502,requestId);
+  return ok(result.data,requestId);
+ }
 
  if(p[0]==="auth"&&p[1]==="me"&&m==="GET"){
   const session=await getAuthenticatedSession(request,env as any);
