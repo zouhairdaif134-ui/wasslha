@@ -22,6 +22,7 @@ import { PERMISSIONS } from "./lib/permissions";
 import { getAdminDashboardOverview } from "./services/admin-dashboard-service";
 import { getAdminOrders, getAdminMerchants, getAdminRiders, getAdminFinance, getAdminSupport, getAdminUsers, getAdminAudit } from "./services/admin-operational-service";
 import { getMerchantDashboard } from "./services/merchant-dashboard-service";
+import { getAdminGovernanceOverview } from "./services/admin-governance-service";
 
 
 function tokenOf(request:Request){const value=request.headers.get("Authorization")??"";return value.startsWith("Bearer ")?value.slice(7):""}
@@ -81,6 +82,11 @@ export async function routeApi(request:Request,env:unknown,requestId:string):Pro
   if(result.error)return fail("ADMIN_AUDIT_ERROR",result.error,502,requestId); return ok(result.data,requestId);
  }
 
+ if(p[0]==="admin"&&p[1]==="governance"&&m==="GET"){
+  const decision=authorize(context,PERMISSIONS.ADMIN_SETTINGS_READ); if(!decision.allowed)return fail("FORBIDDEN",decision.reason??"Permission denied",403,requestId);
+  const result=await getAdminGovernanceOverview(uid,env as any); if(result.error)return fail("ADMIN_GOVERNANCE_ERROR",result.error,502,requestId);
+  return ok(result.data,requestId);
+ }
  if(p[0]==="admin"&&p[1]==="overview"&&m==="GET"){
   const decision=authorize(context,PERMISSIONS.ADMIN_DASHBOARD_VIEW);
   if(!decision.allowed)return fail("FORBIDDEN",decision.reason??"Permission denied",403,requestId);
