@@ -2,18 +2,15 @@
  * WASSLHA
  * Backend Authorization Guard
  *
- * Server-side authorization helpers.
- * Role resolution comes from the database.
+ * Central server-side authorization layer.
+ * Authentication and role resolution are handled
+ * by the request context.
  *
+ * Database RLS remains authoritative.
  * Berrechid MVP.
  */
 
 import type { RequestContext } from "./request-context";
-import {
-  hasRole,
-  hasAnyRole,
-  type UserRole,
-} from "./rbac";
 import type { Permission } from "./permissions";
 
 export interface AuthorizationResult {
@@ -24,9 +21,11 @@ export interface AuthorizationResult {
 /**
  * Temporary role-to-permission mapping.
  *
- * This is intentionally centralized.
- * It will later be replaced/extended by the
- * database-backed permission model.
+ * This mapping is centralized so that API authorization
+ * remains consistent across backend modules.
+ *
+ * The database/RLS layer remains authoritative for
+ * actual data access.
  */
 const ROLE_PERMISSIONS: Record<
   string,
@@ -36,6 +35,7 @@ const ROLE_PERMISSIONS: Record<
     "admin.dashboard.view",
     "admin.users.read",
     "admin.users.manage",
+
     "merchant.dashboard.view",
     "merchant.profile.read",
     "merchant.profile.update",
@@ -43,6 +43,7 @@ const ROLE_PERMISSIONS: Record<
     "merchant.products.manage",
     "merchant.orders.read",
     "merchant.orders.update",
+
     "rider.app.access",
     "rider.profile.read",
     "rider.profile.update",
@@ -51,25 +52,32 @@ const ROLE_PERMISSIONS: Record<
     "rider.deliveries.read",
     "rider.deliveries.update",
     "rider.location.update",
+
     "customer.app.access",
     "customer.profile.read",
     "customer.profile.update",
     "customer.addresses.manage",
     "customer.orders.read",
     "customer.orders.create",
+
     "get_request.create",
     "get_request.read",
     "get_request.manage",
+
     "payments.read",
     "payments.create",
     "payments.manage",
+
     "wallet.read",
     "wallet.manage",
+
     "support.create",
     "support.read",
     "support.manage",
+
     "reviews.create",
     "reviews.manage",
+
     "notifications.read",
     "notifications.manage",
   ],
@@ -82,9 +90,12 @@ const ROLE_PERMISSIONS: Record<
     "merchant.products.manage",
     "merchant.orders.read",
     "merchant.orders.update",
+
     "support.create",
     "support.read",
-    "reviews.read",
+
+    "reviews.manage",
+
     "notifications.read",
   ],
 
@@ -97,9 +108,12 @@ const ROLE_PERMISSIONS: Record<
     "rider.deliveries.read",
     "rider.deliveries.update",
     "rider.location.update",
+
     "wallet.read",
+
     "support.create",
     "support.read",
+
     "notifications.read",
   ],
 
@@ -110,24 +124,30 @@ const ROLE_PERMISSIONS: Record<
     "customer.addresses.manage",
     "customer.orders.read",
     "customer.orders.create",
+
     "get_request.create",
     "get_request.read",
+
     "payments.read",
     "payments.create",
+
     "wallet.read",
+
     "support.create",
     "support.read",
+
     "reviews.create",
+
     "notifications.read",
   ],
 };
 
 function roleHasPermission(
-  role: UserRole,
+  roleName: string,
   permission: Permission,
 ): boolean {
   return (
-    ROLE_PERMISSIONS[role.name]?.includes(
+    ROLE_PERMISSIONS[roleName]?.includes(
       permission,
     ) ?? false
   );
@@ -142,7 +162,10 @@ export function hasPermission(
   }
 
   return context.roles.some((role) =>
-    roleHasPermission(role, permission),
+    roleHasPermission(
+      role.name,
+      permission,
+    ),
   );
 }
 
@@ -151,27 +174,10 @@ export function hasAnyPermission(
   permissions: Permission[],
 ): boolean {
   return permissions.some((permission) =>
-    hasPermission(context, permission),
-  );
-}
-
-export function hasRoleAccess(
-  context: RequestContext,
-  roleName: string,
-): boolean {
-  return hasRole(
-    context.roles,
-    roleName,
-  );
-}
-
-export function hasAnyRoleAccess(
-  context: RequestContext,
-  roleNames: string[],
-): boolean {
-  return hasAnyRole(
-    context.roles,
-    roleNames,
+    hasPermission(
+      context,
+      permission,
+    ),
   );
 }
 
@@ -186,17 +192,19 @@ export function authorize(
     };
   }
 
-  if (
-    !context.roles ||
-    context.roles.length === 0
-  ) {
+  if (context.roles.length === 0) {
     return {
       allowed: false,
       reason: "No role assigned",
     };
   }
 
-  if (!hasPermission(context, permission)) {
+  if (
+    !hasPermission(
+      context,
+      permission,
+    )
+  ) {
     return {
       allowed: false,
       reason: "Permission denied",
