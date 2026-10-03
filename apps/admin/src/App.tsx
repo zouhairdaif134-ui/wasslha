@@ -1,4 +1,5 @@
 import { FormEvent, useEffect, useState } from "react";
+import AdminModule from "./AdminModule";
 import { getAdminDashboardOverview, getAdminSession, type AdminDashboardOverview, type AdminSession } from "./lib/api";
 import {
   getCurrentSession,
