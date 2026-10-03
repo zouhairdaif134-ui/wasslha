@@ -22,11 +22,15 @@ export interface UserAddress {
   id: string;
   user_id: string;
   label?: string | null;
-  address_line?: string | null;
-  city?: string | null;
+  address_text: string;
+  apartment?: string | null;
+  floor?: string | null;
+  landmark?: string | null;
+  delivery_note?: string | null;
   latitude?: number | null;
   longitude?: number | null;
   is_default?: boolean;
+  is_active?: boolean;
   created_at?: string;
   updated_at?: string;
 }
@@ -121,11 +125,15 @@ export async function updateUserAddress(
     Pick<
       UserAddress,
       | "label"
-      | "address_line"
-      | "city"
+      | "address_text"
+      | "apartment"
+      | "floor"
+      | "landmark"
+      | "delivery_note"
       | "latitude"
       | "longitude"
       | "is_default"
+      | "is_active"
     >
   >,
 ): Promise<
