@@ -64,7 +64,11 @@ export async function routeApi(request:Request,env:unknown,requestId:string):Pro
 
   if(p[0]==="payments"&&m==="GET"&&id&&p[2]==="transactions")return ok(await getPaymentTransactions(id,env as any,token),requestId);
   if(p[0]==="payments"&&m==="GET")return ok(await getCustomerPayments(uid,env as any,token),requestId);
-  if(p[0]==="wallet"&&id==="me"&&p[2]==="transactions"&&m==="GET")return ok(await getWalletTransactions(uid,env as any,token),requestId);
+  if(p[0]==="wallet"&&id==="me"&&p[2]==="transactions"&&m==="GET"){
+   const wallet=await getUserWallet(uid,env as any,token);
+   if(!wallet.data)return ok([],requestId);
+   return ok(await getWalletTransactions(wallet.data.id,env as any,token),requestId);
+  }
   if(p[0]==="wallet"&&id==="me"&&m==="GET")return ok(await getUserWallet(uid,env as any,token),requestId);
   if(p[0]==="notifications"&&m==="PATCH"&&id&&p[2]==="read")return ok(await markNotificationAsRead(id,uid,env as any,token),requestId);
   if(p[0]==="notifications"&&m==="GET")return ok(await getUserNotifications(uid,env as any,token),requestId);
