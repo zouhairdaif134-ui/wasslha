@@ -132,3 +132,11 @@ export type AdminTicketRow = { id:string; user_id:string; user_name:string|null;
 export type AdminComplaintRow = { id:string; user_id:string; user_name:string|null; master_order_id:string|null; order_number:string|null; complaint_type:string; description:string; status:string; resolution:string|null; resolved_by:string|null; resolved_at:string|null; created_at:string; updated_at:string; };
 export type AdminUserRow = { id:string; full_name:string|null; phone:string|null; preferred_language:string; is_active:boolean; created_at:string; updated_at:string; roles:Array<{id:string;code:string;name:string}>; };
 export type AdminAuditRow = { id:string; actor_user_id:string|null; actor_name:string|null; action:string; entity_type:string; entity_id:string|null; before_data:unknown; after_data:unknown; metadata:unknown; ip_address:string|null; user_agent:string|null; created_at:string; };
+
+export type AdminGovernanceOverview={settings:number;sensitive_settings:number;open_risk_flags:number;critical_risk_flags:number;active_app_versions:number;latest_releases:number;setting_changes_today:number};
+export async function getAdminGovernanceOverview(accessToken:string):Promise<AdminGovernanceOverview>{
+ const response=await fetch(`${apiBaseUrl}/api/v1/admin/governance`,{headers:{Authorization:`Bearer ${accessToken}`,Accept:"application/json"}});
+ const payload=await response.json() as {success?:boolean;data?:AdminGovernanceOverview;error?:{message?:string}};
+ if(!response.ok||!payload.success||!payload.data)throw new Error(payload.error?.message??"Unable to load governance.");
+ return payload.data;
+}
