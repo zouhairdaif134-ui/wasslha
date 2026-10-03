@@ -115,7 +115,9 @@ export async function routeApi(request:Request,env:unknown,requestId:string):Pro
  if(p[0]==="merchant"&&id==="me"&&p[2]==="dashboard"&&m==="GET"){
    const decision=authorize(context,PERMISSIONS.MERCHANT_DASHBOARD_VIEW); if(!decision.allowed)return fail("FORBIDDEN",decision.reason??"Permission denied",403,requestId);
    const merchant=await getMerchantByOwner(uid,env as any,token); if(!merchant.data)return fail("MERCHANT_NOT_FOUND","Merchant account not found",404,requestId);
-   return ok(await getMerchantDashboard(merchant.data.id,env as any,token),requestId);
+   const result=await getMerchantDashboard(merchant.data.id,env as any,token);
+   if(!result.success||!result.data)return fail("MERCHANT_DASHBOARD_ERROR",result.error??"Unable to load merchant dashboard",502,requestId);
+   return ok(result.data,requestId);
   }
 
 
