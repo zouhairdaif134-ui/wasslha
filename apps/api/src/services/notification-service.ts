@@ -23,6 +23,9 @@ export interface Notification {
   title: string;
   body: string;
   data?: Record<string, unknown> | null;
+  channel: "in_app" | "push" | "sms" | "telegram";
+  status: "pending" | "sent" | "failed" | "read";
+  sent_at?: string | null;
   read_at?: string | null;
   created_at?: string;
 }
