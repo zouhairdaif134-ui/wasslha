@@ -4,29 +4,34 @@
  *
  * Server-side delivery read operations.
  *
+ * Delivery state changes are handled by the order/delivery workflow.
  * Berrechid MVP.
  */
 
 import {
   databaseGet,
-  databaseUpdate,
   type DatabaseEnv,
 } from "../lib/database";
 
-export interface DeliveryServiceEnv
-  extends DatabaseEnv {}
+export interface DeliveryServiceEnv extends DatabaseEnv {}
 
 export interface Delivery {
   id: string;
   master_order_id: string;
-  status?: string | null;
-  pickup_address?: string | null;
-  delivery_address?: string | null;
+  pickup_address_text?: string | null;
+  delivery_address_text: string;
   pickup_latitude?: number | null;
   pickup_longitude?: number | null;
   delivery_latitude?: number | null;
   delivery_longitude?: number | null;
-  assigned_rider_id?: string | null;
+  distance_meters?: number | null;
+  eta_seconds?: number | null;
+  status?: string | null;
+  customer_note?: string | null;
+  started_at?: string | null;
+  picked_up_at?: string | null;
+  delivered_at?: string | null;
+  cancelled_at?: string | null;
   created_at?: string;
   updated_at?: string;
 }
@@ -35,12 +40,13 @@ export interface DeliveryAssignment {
   id: string;
   delivery_id: string;
   rider_id: string;
+  assigned_by?: string | null;
   status?: string | null;
-  assigned_at?: string;
-  accepted_at?: string | null;
+  offered_at?: string;
+  responded_at?: string | null;
   completed_at?: string | null;
+  rejection_reason?: string | null;
   created_at?: string;
-  updated_at?: string;
 }
 
 export interface DeliveryServiceResult<T> {
@@ -53,33 +59,20 @@ export async function getDeliveryByOrder(
   orderId: string,
   env: DeliveryServiceEnv,
   accessToken: string,
-): Promise<
-  DeliveryServiceResult<Delivery | null>
-> {
-  const result =
-    await databaseGet<Delivery[]>(
-      `/rest/v1/deliveries` +
-        `?select=*` +
-        `&master_order_id=eq.${encodeURIComponent(
-          orderId,
-        )}` +
-        `&limit=1`,
-      env,
-      accessToken,
-    );
+): Promise<DeliveryServiceResult<Delivery | null>> {
+  const result = await databaseGet<Delivery[]>(
+    `/rest/v1/deliveries?select=*&master_order_id=eq.${encodeURIComponent(orderId)}&limit=1`,
+    env,
+    accessToken,
+  );
 
   if (result.error) {
-    return {
-      success: false,
-      data: null,
-      error: result.error,
-    };
+    return { success: false, data: null, error: result.error };
   }
 
   return {
     success: true,
-    data:
-      result.data?.[0] ?? null,
+    data: result.data?.[0] ?? null,
     error: null,
   };
 }
@@ -88,27 +81,45 @@ export async function getRiderDeliveries(
   riderId: string,
   env: DeliveryServiceEnv,
   accessToken: string,
-): Promise<
-  DeliveryServiceResult<Delivery[]>
-> {
-  const result =
-    await databaseGet<Delivery[]>(
-      `/rest/v1/deliveries` +
-        `?select=*` +
-        `&assigned_rider_id=eq.${encodeURIComponent(
-          riderId,
-        )}` +
-        `&order=created_at.desc`,
-      env,
-      accessToken,
-    );
+): Promise<DeliveryServiceResult<Delivery[]>> {
+  const assignmentsResult = await databaseGet<DeliveryAssignment[]>(
+    `/rest/v1/delivery_assignments?select=delivery_id&` +
+      `rider_id=eq.${encodeURIComponent(riderId)}&` +
+      `status=in.(offered,accepted,completed)&order=created_at.desc`,
+    env,
+    accessToken,
+  );
 
-  if (result.error) {
+  if (assignmentsResult.error) {
     return {
       success: false,
       data: null,
-      error: result.error,
+      error: assignmentsResult.error,
     };
+  }
+
+  const deliveryIds = [
+    ...new Set(
+      (assignmentsResult.data ?? [])
+        .map((assignment) => assignment.delivery_id)
+        .filter(Boolean),
+    ),
+  ];
+
+  if (deliveryIds.length === 0) {
+    return { success: true, data: [], error: null };
+  }
+
+  const inFilter = deliveryIds.map(encodeURIComponent).join(",");
+
+  const result = await databaseGet<Delivery[]>(
+    `/rest/v1/deliveries?select=*&id=in.(${inFilter})&order=created_at.desc`,
+    env,
+    accessToken,
+  );
+
+  if (result.error) {
+    return { success: false, data: null, error: result.error };
   }
 
   return {
@@ -122,69 +133,22 @@ export async function getDeliveryAssignments(
   deliveryId: string,
   env: DeliveryServiceEnv,
   accessToken: string,
-): Promise<
-  DeliveryServiceResult<DeliveryAssignment[]>
-> {
-  const result =
-    await databaseGet<DeliveryAssignment[]>(
-      `/rest/v1/delivery_assignments` +
-        `?select=*` +
-        `&delivery_id=eq.${encodeURIComponent(
-          deliveryId,
-        )}` +
-        `&order=created_at.desc`,
-      env,
-      accessToken,
-    );
+): Promise<DeliveryServiceResult<DeliveryAssignment[]>> {
+  const result = await databaseGet<DeliveryAssignment[]>(
+    `/rest/v1/delivery_assignments?select=*&delivery_id=eq.${encodeURIComponent(
+      deliveryId,
+    )}&order=created_at.desc`,
+    env,
+    accessToken,
+  );
 
   if (result.error) {
-    return {
-      success: false,
-      data: null,
-      error: result.error,
-    };
+    return { success: false, data: null, error: result.error };
   }
 
   return {
     success: true,
     data: result.data ?? [],
-    error: null,
-  };
-}
-
-export async function updateDeliveryStatus(
-  deliveryId: string,
-  status: string,
-  env: DeliveryServiceEnv,
-  accessToken: string,
-): Promise<
-  DeliveryServiceResult<Delivery | null>
-> {
-  const result =
-    await databaseUpdate<Delivery[]>(
-      `/rest/v1/deliveries` +
-        `?id=eq.${encodeURIComponent(
-          deliveryId,
-        )}`,
-      env,
-      {
-        status,
-      },
-      accessToken,
-    );
-
-  if (result.error) {
-    return {
-      success: false,
-      data: null,
-      error: result.error,
-    };
-  }
-
-  return {
-    success: true,
-    data:
-      result.data?.[0] ?? null,
     error: null,
   };
 }
