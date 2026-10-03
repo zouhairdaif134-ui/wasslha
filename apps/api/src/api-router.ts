@@ -40,6 +40,7 @@ export async function routeApi(request:Request,env:unknown,requestId:string):Pro
  const context=await createRequestContext(request,env as Parameters<typeof createRequestContext>[1]);
  if(!isAuthenticated(context))return fail("UNAUTHORIZED",context.error??"Authentication required",401,requestId);
  const token=tokenOf(request),uid=context.user!.id;
+ const p=u.pathname.replace(/^\/api\/v1\/?/,"").split("/").filter(Boolean),m=request.method.toUpperCase(),id=p[1];
 
  if(p[0]==="auth"&&p[1]==="me"&&m==="GET"){
   const session=await getAuthenticatedSession(request,env as any);
@@ -52,7 +53,6 @@ export async function routeApi(request:Request,env:unknown,requestId:string):Pro
    admin:true,
   },requestId);
  }
- const p=u.pathname.replace(/^\/api\/v1\/?/,"").split("/").filter(Boolean),m=request.method.toUpperCase(),id=p[1];
  try{
   if(p[0]==="categories"&&m==="GET")return ok(await getCategories(env as any,token),requestId);
   if(p[0]==="products"&&m==="GET"&&id)return ok(await getProduct(id,env as any,token),requestId);
