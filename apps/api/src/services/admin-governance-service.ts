@@ -1,0 +1,3 @@
+import {servicePost,type ServiceResult} from "../lib/service-client";import type {ServiceAuthEnv} from "../lib/service-auth";
+export type GovernanceOverview={settings:number;sensitive_settings:number;open_risk_flags:number;critical_risk_flags:number;active_app_versions:number;latest_releases:number;setting_changes_today:number};
+export function getAdminGovernanceOverview(adminUserId:string,env:ServiceAuthEnv):Promise<ServiceResult<GovernanceOverview>>{return servicePost<GovernanceOverview>("/rest/v1/rpc/admin_governance_overview",env,{p_admin_user_id:adminUserId});}
