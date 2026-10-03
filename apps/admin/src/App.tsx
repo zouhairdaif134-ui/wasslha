@@ -1,4 +1,12 @@
-import { useMemo, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
+import { getAdminSession, type AdminSession } from "./lib/api";
+import {
+  getCurrentSession,
+  signInAdmin,
+  signOutAdmin,
+  supabase,
+  verifyAdminMfa,
+} from "./lib/admin-auth";
 
 type NavItem = {
   key: string;
@@ -25,14 +33,196 @@ const kpis = [
   { label: "التوصيلات النشطة", value: "—", detail: "GPS / Dispatch" },
 ];
 
-function App() {
+function LoginScreen({
+  onAuthenticated,
+}: {
+  onAuthenticated: (session: AdminSession) => void;
+}) {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [code, setCode] = useState("");
+  const [factorId, setFactorId] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function finishAuthorization() {
+    const session = await getCurrentSession();
+    if (!session?.access_token) throw new Error("No authenticated session.");
+    const adminSession = await getAdminSession(session.access_token);
+    onAuthenticated(adminSession);
+  }
+
+  async function submitLogin(event: FormEvent) {
+    event.preventDefault();
+    setLoading(true);
+    setError(null);
+
+    const result = await signInAdmin(email.trim(), password);
+    if (result.error) {
+      setError(result.error);
+      setLoading(false);
+      return;
+    }
+
+    if (result.mfaRequired && result.factorId) {
+      setFactorId(result.factorId);
+      setLoading(false);
+      return;
+    }
+
+    try {
+      await finishAuthorization();
+    } catch (authorizationError) {
+      await signOutAdmin();
+      setError(
+        authorizationError instanceof Error
+          ? authorizationError.message
+          : "Admin authorization denied.",
+      );
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function submitMfa(event: FormEvent) {
+    event.preventDefault();
+    if (!factorId) return;
+
+    setLoading(true);
+    setError(null);
+    const result = await verifyAdminMfa(factorId, code.trim());
+
+    if (result.error) {
+      setError(result.error);
+      setLoading(false);
+      return;
+    }
+
+    try {
+      await finishAuthorization();
+    } catch (authorizationError) {
+      await signOutAdmin();
+      setError(
+        authorizationError instanceof Error
+          ? authorizationError.message
+          : "Admin authorization denied.",
+      );
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <main className="auth-page" dir="rtl">
+      <section className="auth-card">
+        <div className="brand auth-brand">
+          <div className="brand-mark">W</div>
+          <div>
+            <strong>WASSLHA</strong>
+            <span>Admin Control Center</span>
+          </div>
+        </div>
+
+        {!factorId ? (
+          <form onSubmit={submitLogin}>
+            <span className="section-kicker">SECURE ADMIN ACCESS</span>
+            <h1>دخول الإدارة</h1>
+            <p className="auth-description">
+              الولوج كيتحقق من Supabase Auth، ومن بعد backend كيتأكد من Admin
+              role والصلاحية ديال dashboard.
+            </p>
+
+            <label>
+              Email
+              <input
+                type="email"
+                autoComplete="username"
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
+                required
+              />
+            </label>
+
+            <label>
+              Password
+              <input
+                type="password"
+                autoComplete="current-password"
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+                required
+              />
+            </label>
+
+            {error && <div className="auth-error">{error}</div>}
+
+            <button className="primary-button" disabled={loading} type="submit">
+              {loading ? "جارِ التحقق..." : "دخول آمن"}
+            </button>
+          </form>
+        ) : (
+          <form onSubmit={submitMfa}>
+            <span className="section-kicker">TWO-FACTOR AUTHENTICATION</span>
+            <h1>التحقق الثنائي</h1>
+            <p className="auth-description">
+              دخل الكود ديال TOTP من authenticator المرتبط بحساب Admin.
+            </p>
+
+            <label>
+              Authentication code
+              <input
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                pattern="[0-9]{6}"
+                maxLength={6}
+                value={code}
+                onChange={(event) => setCode(event.target.value)}
+                required
+              />
+            </label>
+
+            {error && <div className="auth-error">{error}</div>}
+
+            <button className="primary-button" disabled={loading} type="submit">
+              {loading ? "جارِ التحقق..." : "تأكيد 2FA"}
+            </button>
+
+            <button
+              className="secondary-button"
+              type="button"
+              onClick={() => {
+                setFactorId(null);
+                setCode("");
+                setError(null);
+              }}
+            >
+              رجوع
+            </button>
+          </form>
+        )}
+
+        {!supabase && (
+          <div className="auth-warning">
+            إعدادات Supabase ناقصة. خاص VITE_SUPABASE_URL و
+            VITE_SUPABASE_ANON_KEY فـ environment ديال Admin.
+          </div>
+        )}
+      </section>
+    </main>
+  );
+}
+
+function Dashboard({ adminSession }: { adminSession: AdminSession }) {
   const [active, setActive] = useState("overview");
   const [language, setLanguage] = useState<"ar" | "fr">("ar");
 
-  const activeLabel = useMemo(
-    () => navItems.find((item) => item.key === active)?.label ?? "نظرة عامة",
-    [active],
-  );
+  const activeLabel =
+    navItems.find((item) => item.key === active)?.label ?? "نظرة عامة";
+
+  async function logout() {
+    await signOutAdmin();
+    window.location.reload();
+  }
 
   return (
     <div className="admin-shell" dir={language === "ar" ? "rtl" : "ltr"}>
@@ -61,7 +251,7 @@ function App() {
 
         <div className="sidebar-footer">
           <span>Berrechid MVP</span>
-          <span className="status-dot">System foundation</span>
+          <span className="status-dot">Authorized Admin</span>
         </div>
       </aside>
 
@@ -77,17 +267,19 @@ function App() {
               className="language-button"
               type="button"
               onClick={() => setLanguage(language === "ar" ? "fr" : "ar")}
-              aria-label="Change language"
             >
               {language === "ar" ? "FR" : "AR"}
             </button>
             <div className="admin-user">
               <span className="avatar">A</span>
               <div>
-                <strong>Admin</strong>
-                <small>Authorized account</small>
+                <strong>{adminSession.user.email ?? "Admin"}</strong>
+                <small>{adminSession.roles.map((role) => role.name).join(" · ")}</small>
               </div>
             </div>
+            <button className="language-button" type="button" onClick={logout}>
+              خروج
+            </button>
           </div>
         </header>
 
@@ -105,7 +297,7 @@ function App() {
               <div className="welcome-badge">Berrechid</div>
             </section>
 
-            <section className="kpi-grid" aria-label="Key performance indicators">
+            <section className="kpi-grid">
               {kpis.map((kpi) => (
                 <article className="kpi-card" key={kpi.label}>
                   <span>{kpi.label}</span>
@@ -122,14 +314,14 @@ function App() {
                     <span className="section-kicker">OPERATIONS</span>
                     <h3>المراقبة التشغيلية</h3>
                   </div>
-                  <span className="panel-state">Ready for API</span>
+                  <span className="panel-state">API v1</span>
                 </div>
                 <div className="empty-state">
                   <div className="empty-icon">⌁</div>
-                  <strong>مازال ما كايناش بيانات live</strong>
+                  <strong>البيانات التشغيلية غادي تجي من API</strong>
                   <p>
-                    الواجهة واجدة باش تربط مباشرة مع API v1 ديال WASSLHA بلا
-                    اختلاق أرقام أو بيانات.
+                    ما كنحطوش أرقام وهمية. كل KPI غادي يتربط بالـ backend
+                    authoritative وبالصلاحيات المناسبة.
                   </p>
                 </div>
               </article>
@@ -140,13 +332,13 @@ function App() {
                     <span className="section-kicker">SECURITY</span>
                     <h3>الأمن والحوكمة</h3>
                   </div>
-                  <span className="secure-state">RLS + Audit</span>
+                  <span className="secure-state">Protected</span>
                 </div>
                 <ul className="check-list">
-                  <li><span>✓</span> RBAC وصلاحيات granular</li>
+                  <li><span>✓</span> Supabase Auth + Admin MFA</li>
+                  <li><span>✓</span> Backend Admin authorization</li>
                   <li><span>✓</span> PostgreSQL RLS</li>
                   <li><span>✓</span> Audit Logs append-only</li>
-                  <li><span>✓</span> Admin settings history</li>
                 </ul>
               </article>
             </section>
@@ -179,9 +371,8 @@ function App() {
             <span className="section-kicker">ADMIN MODULE</span>
             <h2>{activeLabel}</h2>
             <p>
-              هاد الـ module داخل فـ Admin Dashboard architecture. الخطوة
-              الموالية هي ربطه بالـ API والـ permissions الخاصة به قبل إظهار
-              بيانات حقيقية.
+              الوحدة محمية بالـ Admin session. قبل إضافة أي mutation، غادي
+              نربطها بالـ API endpoint والـ permission والـ audit trail ديالها.
             </p>
             <button className="back-button" type="button" onClick={() => setActive("overview")}>
               رجوع للـ Overview
@@ -193,4 +384,54 @@ function App() {
   );
 }
 
-export default App;
+export default function App() {
+  const [loading, setLoading] = useState(true);
+  const [adminSession, setAdminSession] = useState<AdminSession | null>(null);
+
+  useEffect(() => {
+    let mounted = true;
+
+    async function restore() {
+      const session = await getCurrentSession();
+      if (!session?.access_token) {
+        if (mounted) setLoading(false);
+        return;
+      }
+
+      try {
+        const currentAdmin = await getAdminSession(session.access_token);
+        if (mounted) setAdminSession(currentAdmin);
+      } catch {
+        await signOutAdmin();
+        if (mounted) setAdminSession(null);
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    }
+
+    void restore();
+
+    const subscription = supabase?.auth.onAuthStateChange(() => {
+      void restore();
+    });
+
+    return () => {
+      mounted = false;
+      subscription?.data.subscription.unsubscribe();
+    };
+  }, []);
+
+  if (loading) {
+    return (
+      <main className="auth-page">
+        <section className="loading-card">جارِ التحقق من Admin session...</section>
+      </main>
+    );
+  }
+
+  if (!adminSession) {
+    return <LoginScreen onAuthenticated={setAdminSession} />;
+  }
+
+  return <Dashboard adminSession={adminSession} />;
+}
