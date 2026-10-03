@@ -1,8 +1,13 @@
 /**
  * WASSLHA API
- * Backend Core — API Foundation
+ * Backend Core — API Foundation + Authentication Middleware
  * Berrechid MVP
  */
+
+import {
+  authenticateRequest,
+  type AuthUser,
+} from "./lib/auth";
 
 export interface Env {
   ENVIRONMENT: string;
@@ -57,6 +62,22 @@ function withCors(response: Response): Response {
   });
 }
 
+function unauthorized(
+  requestId: string,
+  message = "Authentication required",
+): Response {
+  return json(
+    {
+      error: {
+        code: "UNAUTHORIZED",
+        message,
+      },
+    },
+    401,
+    requestId,
+  );
+}
+
 function notFound(requestId: string): Response {
   return json(
     {
@@ -94,6 +115,26 @@ function methodNotAllowed(
   });
 }
 
+function authenticatedUserResponse(
+  user: AuthUser,
+  requestId: string,
+): Response {
+  return json(
+    {
+      data: {
+        user: {
+          id: user.id,
+          email: user.email ?? null,
+          phone: user.phone ?? null,
+          user_metadata: user.user_metadata ?? {},
+        },
+      },
+    },
+    200,
+    requestId,
+  );
+}
+
 async function handleApiRequest(
   request: Request,
   env: Env,
@@ -103,10 +144,9 @@ async function handleApiRequest(
   const path = url.pathname;
   const method = request.method.toUpperCase();
 
-  // -------------------------------------------------------
-  // API root
-  // -------------------------------------------------------
-
+  /*
+   * Public API root
+   */
   if (path === API_PREFIX || path === `${API_PREFIX}/`) {
     if (method !== "GET") {
       return methodNotAllowed(requestId, ["GET"]);
@@ -124,10 +164,9 @@ async function handleApiRequest(
     );
   }
 
-  // -------------------------------------------------------
-  // Health check
-  // -------------------------------------------------------
-
+  /*
+   * Public health endpoint
+   */
   if (path === `${API_PREFIX}/health`) {
     if (method !== "GET") {
       return methodNotAllowed(requestId, ["GET"]);
@@ -147,10 +186,9 @@ async function handleApiRequest(
     );
   }
 
-  // -------------------------------------------------------
-  // Readiness check
-  // -------------------------------------------------------
-
+  /*
+   * Public readiness endpoint
+   */
   if (path === `${API_PREFIX}/ready`) {
     if (method !== "GET") {
       return methodNotAllowed(requestId, ["GET"]);
@@ -178,27 +216,51 @@ async function handleApiRequest(
     );
   }
 
-  // -------------------------------------------------------
-  // API v1 placeholder
-  //
-  // Feature modules will be registered here:
-  //
-  // /auth
-  // /users
-  // /merchants
-  // /stores
-  // /products
-  // /orders
-  // /deliveries
-  // /riders
-  // /payments
-  // /wallets
-  // /get-requests
-  // /notifications
-  // /support
-  // -------------------------------------------------------
+  /*
+   * Authentication routes
+   */
+  if (path === `${API_PREFIX}/auth/me`) {
+    if (method !== "GET") {
+      return methodNotAllowed(requestId, ["GET"]);
+    }
 
+    const auth = await authenticateRequest(request, env);
+
+    if (!auth.authenticated || !auth.user) {
+      return unauthorized(
+        requestId,
+        auth.error || "Authentication required",
+      );
+    }
+
+    return authenticatedUserResponse(
+      auth.user,
+      requestId,
+    );
+  }
+
+  /*
+   * Protected API namespace.
+   *
+   * All future authenticated application routes
+   * will pass through this authentication boundary.
+   */
   if (path.startsWith(`${API_PREFIX}/`)) {
+    const auth = await authenticateRequest(request, env);
+
+    if (!auth.authenticated || !auth.user) {
+      return unauthorized(
+        requestId,
+        auth.error || "Authentication required",
+      );
+    }
+
+    /*
+     * Authentication is valid.
+     *
+     * RBAC, permissions and module-specific handlers
+     * will be added here in the next backend stages.
+     */
     return notFound(requestId);
   }
 
@@ -213,10 +275,6 @@ export default {
     const requestId = getRequestId(request);
 
     try {
-      // -----------------------------------------------------
-      // CORS preflight
-      // -----------------------------------------------------
-
       if (request.method.toUpperCase() === "OPTIONS") {
         return withCors(
           new Response(null, {
@@ -226,4 +284,34 @@ export default {
             },
           }),
         );
-     
+      }
+
+      const response = await handleApiRequest(
+        request,
+        env,
+        requestId,
+      );
+
+      return withCors(response);
+    } catch (error) {
+      console.error("Unhandled API error", {
+        requestId,
+        error,
+      });
+
+      return withCors(
+        json(
+          {
+            error: {
+              code: "INTERNAL_SERVER_ERROR",
+              message: "An unexpected error occurred",
+            },
+            request_id: requestId,
+          },
+          500,
+          requestId,
+        ),
+      );
+    }
+  },
+};
