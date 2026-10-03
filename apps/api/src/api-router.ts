@@ -19,7 +19,7 @@ import { getMyRequests,getRequest,getRequestItems,getRequestOffers } from "./ser
 function bearer(request:Request){const v=request.headers.get("Authorization")??"";return v.startsWith("Bearer ")?v.slice(7):""}
 export async function routeApi(request:Request,env:any,requestId:string):Promise<Response>{
  const context=await createRequestContext(request,env); const token=bearer(request);
- if(!isAuthenticated(context))return errorResponse({code:"UNAUTHORIZED",message:context.error??"Authentication required"},401,requestId);
+ if(!isAuthenticated(context))return errorResponse({code:"UNAUTHORIZED",message:context.error??"Authentication required",status:401},{requestId});
  const u=new URL(request.url); const p=u.pathname.replace(/^\/api\/v1\/?/,"").split("/"); const m=request.method.toUpperCase(); const id=p[1];
  const uid=context.user!.id;
  try{
@@ -29,9 +29,12 @@ export async function routeApi(request:Request,env:any,requestId:string):Promise
   if(p[0]==="merchants"&&m==="GET"&&id)return successResponse(await getMerchant(id,env,token),requestId);
   if(p[0]==="merchant"&&p[1]==="me"&&m==="GET")return successResponse(await getMerchantByOwner(uid,env,token),requestId);
   if(p[0]==="orders"&&m==="GET"&&!id)return successResponse(await getCustomerOrders(uid,env,token),requestId);
-  if(p[0]==="orders"&&m==="GET"&&id&&p[2]==="suborders")return successResponse(await getOrderSubOrders(id,env,token),requestId);
+  if(p[0]==="orders"&&m==="GET"&&id&&p[2]==="suborders")return successResponse(await getOrderSubOrders(id,env,token),{requestId});
   if(p[0]==="orders"&&m==="GET"&&id&&p[2]==="history")return successResponse(await getOrderStatusHistory(id,env,token),requestId);
-  if(p[0]==="orders"&&m==="GET"&&id)return successResponse(await getOrder(id,env,token),requestId);
+  if(p[0]==="orders"&&m==="GET"&&id&&p[2]==="payment")return successResponse(await getPaymentByOrder(id,env,token),{requestId});
+  if(p[0]==="orders"&&m==="GET"&&id&&p[2]==="delivery")return successResponse(await getDeliveryByOrder(id,env,token),{requestId});
+  if(p[0]==="orders"&&m==="GET"&&id&&p[2]==="refunds")return successResponse(await getOrderRefunds(id,env,token),{requestId});
+  if(p[0]==="orders"&&m==="GET"&&id)return successResponse(await getOrder(id,env,token),{requestId});
   if(p[0]==="orders"&&m==="GET"&&id&&p[2]==="payment")return successResponse(await getPaymentByOrder(id,env,token),requestId);
   if(p[0]==="deliveries"&&m==="GET"&&id&&p[2]==="assignments")return successResponse(await getDeliveryAssignments(id,env,token),requestId);
   if(p[0]==="orders"&&m==="GET"&&id&&p[2]==="delivery")return successResponse(await getDeliveryByOrder(id,env,token),requestId);
@@ -63,6 +66,6 @@ export async function routeApi(request:Request,env:any,requestId:string):Promise
   if(p[0]==="get-requests"&&m==="GET"&&id&&p[2]==="items")return successResponse(await getRequestItems(id,env,token),requestId);
   if(p[0]==="get-requests"&&m==="GET"&&id&&p[2]==="offers")return successResponse(await getRequestOffers(id,env,token),requestId);
   if(p[0]==="get-requests"&&m==="GET"&&id)return successResponse(await getRequest(id,env,token),requestId);
-  return errorResponse({code:"NOT_FOUND",message:"API route not found"},404,requestId);
- }catch(error){console.error("API route error",{requestId,error});return errorResponse({code:"INTERNAL_SERVER_ERROR",message:"An unexpected error occurred"},500,requestId)}
+  return errorResponse({code:"NOT_FOUND",message:"API route not found",status:404},requestId);
+ }catch(error){console.error("API route error",{requestId,error});return errorResponse({code:"INTERNAL_SERVER_ERROR",message:"An unexpected error occurred",status:500},requestId)}
 }
