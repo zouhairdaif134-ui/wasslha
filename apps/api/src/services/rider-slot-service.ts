@@ -161,23 +161,3 @@ export async function getRiderAttendance(
   return { success: true, data: result.data ?? [], error: null };
 }
 
-export async function updateOwnWaitlistStatus(
-  waitlistId: string,
-  riderId: string,
-  status: "cancelled",
-  env: RiderSlotServiceEnv,
-  accessToken: string,
-): Promise<RiderSlotServiceResult<SlotWaitlistEntry | null>> {
-  const result = await databaseUpdate<SlotWaitlistEntry[]>(
-    `/rest/v1/slot_waitlist?id=eq.${encodeURIComponent(waitlistId)}&rider_id=eq.${encodeURIComponent(riderId)}&status=eq.waiting`,
-    env,
-    { status, resolved_at: new Date().toISOString() },
-    accessToken,
-  );
-
-  if (result.error) {
-    return { success: false, data: null, error: result.error };
-  }
-
-  return { success: true, data: result.data?.[0] ?? null, error: null };
-}
