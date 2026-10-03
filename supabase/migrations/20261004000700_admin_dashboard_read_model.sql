@@ -7,7 +7,7 @@
 
 begin;
 
-create or replace function public.admin_dashboard_overview()
+create or replace function public.admin_dashboard_overview(p_admin_user_id uuid)
 returns jsonb
 language plpgsql
 security definer
@@ -18,7 +18,7 @@ declare
     v_day_end timestamptz;
     v_result jsonb;
 begin
-    if not public.has_role(auth.uid(), 'admin') then
+    if not public.has_role(p_admin_user_id, 'admin') then
         raise exception 'ADMIN_REQUIRED';
     end if;
 
@@ -154,10 +154,10 @@ begin
 end;
 $$;
 
-revoke all on function public.admin_dashboard_overview() from public, anon, authenticated;
-grant execute on function public.admin_dashboard_overview() to service_role;
+revoke all on function public.admin_dashboard_overview(uuid) from public, anon, authenticated;
+grant execute on function public.admin_dashboard_overview(uuid) to service_role;
 
-comment on function public.admin_dashboard_overview() is
+comment on function public.admin_dashboard_overview(uuid) is
     'Read-only Admin Dashboard overview for the Berrechid MVP. Admin authorization required.';
 
 commit;
