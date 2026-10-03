@@ -429,7 +429,7 @@ using (
         select 1
         from public.riders r
         where r.id = get_request_offers.rider_id
-          and r.user_id = auth.uid()
+          and r.id = auth.uid()
     )
 );
 
@@ -462,7 +462,7 @@ using (
         join public.riders r
             on r.id = gro.rider_id
         where gro.get_request_id = get_request_status_history.get_request_id
-          and r.user_id = auth.uid()
+          and r.id = auth.uid()
     )
 );
 
