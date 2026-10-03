@@ -36,12 +36,9 @@ export async function getAdminDashboardOverview(
   adminUserId: string,
   env: ServiceAuthEnv,
 ): Promise<ServiceResult<AdminDashboardOverview>> {
-  return servicePost<AdminDashboardOverview[]>(
+  return servicePost<AdminDashboardOverview>(
     "/rest/v1/rpc/admin_dashboard_overview",
     env,
     { p_admin_user_id: adminUserId },
-  ).then((result) => ({
-    ...result,
-    data: result.data?.[0] ?? null,
-  }));
+  );
 }
