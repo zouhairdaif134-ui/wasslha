@@ -174,8 +174,11 @@ export async function getOrderStatusHistory(
       Array<{
         id: string;
         master_order_id: string;
-        status?: string | null;
-        note?: string | null;
+        old_status?: string | null;
+        new_status?: string | null;
+        changed_by?: string | null;
+        reason?: string | null;
+        metadata?: Record<string, unknown>;
         created_at?: string;
       }>
     >(
