@@ -1,5 +1,5 @@
 import { FormEvent, useEffect, useState } from "react";
-import { getAdminSession, type AdminSession } from "./lib/api";
+import { getAdminDashboardOverview, getAdminSession, type AdminDashboardOverview, type AdminSession } from "./lib/api";
 import {
   getCurrentSession,
   signInAdmin,
@@ -214,10 +214,43 @@ function LoginScreen({
 
 function Dashboard({ adminSession }: { adminSession: AdminSession }) {
   const [active, setActive] = useState("overview");
+  const [overview, setOverview] = useState<AdminDashboardOverview | null>(null);
+  const [overviewLoading, setOverviewLoading] = useState(true);
+  const [overviewError, setOverviewError] = useState<string | null>(null);
   const [language, setLanguage] = useState<"ar" | "fr">("ar");
 
   const activeLabel =
     navItems.find((item) => item.key === active)?.label ?? "نظرة عامة";
+
+  useEffect(() => {
+    if (active !== "overview") return;
+    let mounted = true;
+
+    async function loadOverview() {
+      setOverviewLoading(true);
+      setOverviewError(null);
+      try {
+        const session = await getCurrentSession();
+        if (!session?.access_token) throw new Error("Admin session expired.");
+        const data = await getAdminDashboardOverview(session.access_token);
+        if (mounted) setOverview(data);
+      } catch (error) {
+        if (mounted) setOverviewError(error instanceof Error ? error.message : "Unable to load overview.");
+      } finally {
+        if (mounted) setOverviewLoading(false);
+      }
+    }
+
+    void loadOverview();
+    return () => {
+      mounted = false;
+    };
+  }, [active]);
+
+  function money(minor: number | string) {
+    const value = Number(minor);
+    return Number.isFinite(value) ? (value / 100).toLocaleString("fr-MA", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "—";
+  }
 
   async function logout() {
     await signOutAdmin();
@@ -298,14 +331,29 @@ function Dashboard({ adminSession }: { adminSession: AdminSession }) {
             </section>
 
             <section className="kpi-grid">
-              {kpis.map((kpi) => (
-                <article className="kpi-card" key={kpi.label}>
-                  <span>{kpi.label}</span>
-                  <strong>{kpi.value}</strong>
-                  <small>{kpi.detail}</small>
-                </article>
-              ))}
+              <article className="kpi-card">
+                <span>الطلبات اليوم</span>
+                <strong>{overviewLoading ? "…" : overview?.today.orders ?? "—"}</strong>
+                <small>{overview ? `${overview.today.delivered_orders} توصيلات مكتملة` : "من API v1"}</small>
+              </article>
+              <article className="kpi-card">
+                <span>GMV اليوم</span>
+                <strong>{overviewLoading ? "…" : overview ? `${money(overview.today.gmv_minor)} MAD` : "—"}</strong>
+                <small>طلبات غير ملغاة / غير مسترجعة</small>
+              </article>
+              <article className="kpi-card">
+                <span>عمولة WASSLHA</span>
+                <strong>{overviewLoading ? "…" : overview ? `${money(overview.finance.commission_minor_today)} MAD` : "—"}</strong>
+                <small>من الـ financial ledger</small>
+              </article>
+              <article className="kpi-card">
+                <span>التوصيلات النشطة</span>
+                <strong>{overviewLoading ? "…" : overview?.operations.active_deliveries ?? "—"}</strong>
+                <small>{overview ? `${overview.operations.online_riders} Riders online` : "GPS / Dispatch"}</small>
+              </article>
             </section>
+
+            {overviewError && <div className="auth-error overview-error">{overviewError}</div>}
 
             <section className="dashboard-grid">
               <article className="panel">
@@ -318,11 +366,17 @@ function Dashboard({ adminSession }: { adminSession: AdminSession }) {
                 </div>
                 <div className="empty-state">
                   <div className="empty-icon">⌁</div>
-                  <strong>البيانات التشغيلية غادي تجي من API</strong>
-                  <p>
-                    ما كنحطوش أرقام وهمية. كل KPI غادي يتربط بالـ backend
-                    authoritative وبالصلاحيات المناسبة.
-                  </p>
+                  <strong>{overview ? "Operational snapshot" : "البيانات التشغيلية غادي تجي من API"}</strong>
+                  {overview ? (
+                    <div className="metric-list">
+                      <span>Orders active: <b>{overview.operations.active_orders}</b></span>
+                      <span>Deliveries active: <b>{overview.operations.active_deliveries}</b></span>
+                      <span>Pending merchants: <b>{overview.operations.pending_merchants}</b></span>
+                      <span>Failed deliveries today: <b>{overview.operations.failed_deliveries_today}</b></span>
+                    </div>
+                  ) : (
+                    <p>ما كنحطوش أرقام وهمية. كل KPI كيتجاب من backend authoritative.</p>
+                  )}
                 </div>
               </article>
 
