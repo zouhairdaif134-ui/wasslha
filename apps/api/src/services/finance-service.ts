@@ -8,13 +8,10 @@
  * Berrechid MVP.
  */
 
-import {
-  databaseGet,
-  databaseInsert,
-  type DatabaseEnv,
-} from "../lib/database";
+import { databaseGet, type DatabaseEnv } from "../lib/database";
+import { servicePost, type ServiceAuthEnv } from "../lib/service-client";
 
-export interface FinanceServiceEnv extends DatabaseEnv {}
+export interface FinanceServiceEnv extends DatabaseEnv, ServiceAuthEnv {}
 
 export interface MerchantSettlement {
   id: string;
@@ -148,7 +145,7 @@ export async function requestRiderWithdrawal(
     return { success: false, data: null, error: "Idempotency key is required" };
   }
 
-  const result = await databaseInsert<RiderWithdrawal[]>(
+  const result = await servicePost<RiderWithdrawal[]>(
     "/rest/v1/rider_withdrawals",
     env,
     {
@@ -158,7 +155,6 @@ export async function requestRiderWithdrawal(
       status: "requested",
       idempotency_key: idempotencyKey,
     },
-    accessToken,
   );
 
   if (result.error) return { success: false, data: null, error: result.error };
