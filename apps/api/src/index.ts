@@ -1,50 +1,50 @@
 /**
  * WASSLHA API
- * Backend Core — Authentication + RBAC
- * Berrechid MVP
+ * Cloudflare Worker entrypoint
+ *
+ * Final integration boundary for the Berrechid MVP API.
+ *
+ * Responsibilities:
+ * - CORS / preflight
+ * - request ID
+ * - security headers
+ * - public health/readiness endpoints
+ * - API v1 routing
+ * - centralized unexpected-error handling
+ *
+ * Business logic stays in api-router.ts and service modules.
  */
 
-import {
-  createRequestContext,
-  isAuthenticated,
-  type RequestContext,
-} from "./lib/request-context";
+import { routeApi } from "./api-router";
+import { API_PREFIX } from "./lib/constants";
+import { getSecurityHeaders } from "./lib/security";
 
 export interface Env {
   ENVIRONMENT: string;
   SUPABASE_URL?: string;
   SUPABASE_ANON_KEY?: string;
+  SUPABASE_SERVICE_ROLE_KEY?: string;
+  GOOGLE_MAPS_API_KEY?: string;
+  TELEGRAM_BOT_TOKEN?: string;
+  PAYMENT_SECRET_KEY?: string;
+  API_RATE_LIMITER?: {
+    limit(input: { key: string }): Promise<{ success: boolean }>;
+  };
 }
 
-type JsonValue = Record<string, unknown>;
+const HEALTH_PATH = `${API_PREFIX}/health`;
+const READY_PATH = `${API_PREFIX}/ready`;
+const AUTH_ME_PATH = `${API_PREFIX}/auth/me`;
 
-const API_PREFIX = "/api/v1";
-
-function json(
-  data: JsonValue,
-  status = 200,
-  requestId?: string,
-): Response {
-  return new Response(JSON.stringify(data), {
-    status,
-    headers: {
-      "Content-Type": "application/json; charset=utf-8",
-      "Cache-Control": "no-store",
-      ...(requestId ? { "X-Request-ID": requestId } : {}),
-    },
-  });
-}
-
-function getRequestId(request: Request): string {
-  return (
-    request.headers.get("X-Request-ID") ||
-    crypto.randomUUID()
-  );
+function requestIdOf(request: Request): string {
+  const supplied = request.headers.get("X-Request-ID")?.trim();
+  return supplied && supplied.length <= 128
+    ? supplied
+    : crypto.randomUUID();
 }
 
 function withCors(response: Response): Response {
   const headers = new Headers(response.headers);
-
   headers.set("Access-Control-Allow-Origin", "*");
   headers.set(
     "Access-Control-Allow-Methods",
@@ -56,6 +56,10 @@ function withCors(response: Response): Response {
   );
   headers.set("Access-Control-Max-Age", "86400");
 
+  for (const [name, value] of Object.entries(getSecurityHeaders())) {
+    headers.set(name, value);
+  }
+
   return new Response(response.body, {
     status: response.status,
     statusText: response.statusText,
@@ -63,41 +67,126 @@ function withCors(response: Response): Response {
   });
 }
 
-function unauthorized(
-  requestId: string,
-  message = "Authentication required",
-): Response {
+function json(data: unknown, status: number, requestId: string): Response {
+  return new Response(JSON.stringify(data), {
+    status,
+    headers: {
+      "Content-Type": "application/json; charset=utf-8",
+      "Cache-Control": "no-store",
+      "X-Request-ID": requestId,
+      ...getSecurityHeaders(),
+    },
+  });
+}
+
+function methodNotAllowed(requestId: string, allowed: string[]): Response {
   return json(
     {
+      success: false,
       error: {
-        code: "UNAUTHORIZED",
-        message,
+        code: "METHOD_NOT_ALLOWED",
+        message: "HTTP method not allowed",
       },
     },
-    401,
+    405,
     requestId,
   );
 }
 
-function forbidden(
-  requestId: string,
-  message = "Access denied",
-): Response {
+function publicApiRoot(env: Env, requestId: string): Response {
   return json(
     {
-      error: {
-        code: "FORBIDDEN",
-        message,
+      success: true,
+      data: {
+        name: "WASSLHA API",
+        version: "v1",
+        environment: env.ENVIRONMENT,
+        status: "ok",
       },
     },
-    403,
+    200,
     requestId,
   );
 }
 
-function notFound(requestId: string): Response {
+function health(env: Env, requestId: string): Response {
   return json(
     {
+      success: true,
+      data: {
+        status: "ok",
+        service: "wasslha-api",
+        version: "v1",
+        environment: env.ENVIRONMENT,
+        timestamp: new Date().toISOString(),
+        request_id: requestId,
+      },
+    },
+    200,
+    requestId,
+  );
+}
+
+function readiness(env: Env, requestId: string): Response {
+  const supabaseConfigured =
+    Boolean(env.SUPABASE_URL?.trim()) &&
+    Boolean(env.SUPABASE_ANON_KEY?.trim());
+
+  return json(
+    {
+      success: supabaseConfigured,
+      data: {
+        status: supabaseConfigured ? "ready" : "degraded",
+        service: "wasslha-api",
+        checks: {
+          api: "ok",
+          supabase: supabaseConfigured ? "configured" : "not_configured",
+        },
+        timestamp: new Date().toISOString(),
+        request_id: requestId,
+      },
+    },
+    supabaseConfigured ? 200 : 503,
+    requestId,
+  );
+}
+
+async function handle(request: Request, env: Env, requestId: string): Promise<Response> {
+  const url = new URL(request.url);
+  const path = url.pathname;
+  const method = request.method.toUpperCase();
+
+  if (path === API_PREFIX || path === `${API_PREFIX}/`) {
+    return method === "GET"
+      ? publicApiRoot(env, requestId)
+      : methodNotAllowed(requestId, ["GET"]);
+  }
+
+  if (path === HEALTH_PATH) {
+    return method === "GET"
+      ? health(env, requestId)
+      : methodNotAllowed(requestId, ["GET"]);
+  }
+
+  if (path === READY_PATH) {
+    return method === "GET"
+      ? readiness(env, requestId)
+      : methodNotAllowed(requestId, ["GET"]);
+  }
+
+  if (path === AUTH_ME_PATH) {
+    if (method !== "GET") {
+      return methodNotAllowed(requestId, ["GET"]);
+    }
+  }
+
+  if (path.startsWith(`${API_PREFIX}/`)) {
+    return routeApi(request, env, requestId);
+  }
+
+  return json(
+    {
+      success: false,
       error: {
         code: "NOT_FOUND",
         message: "API route not found",
@@ -108,275 +197,40 @@ function notFound(requestId: string): Response {
   );
 }
 
-function methodNotAllowed(
-  requestId: string,
-  allowed: string[],
-): Response {
-  const response = json(
-    {
-      error: {
-        code: "METHOD_NOT_ALLOWED",
-        message: "HTTP method not allowed",
-      },
-    },
-    405,
-    requestId,
-  );
-
-  const headers = new Headers(response.headers);
-  headers.set("Allow", allowed.join(", "));
-
-  return new Response(response.body, {
-    status: response.status,
-    headers,
-  });
-}
-
-function authMeResponse(
-  context: RequestContext,
-  requestId: string,
-): Response {
-  return json(
-    {
-      data: {
-        user: {
-          id: context.user?.id ?? null,
-          email: context.user?.email ?? null,
-          phone: context.user?.phone ?? null,
-          user_metadata:
-            context.user?.user_metadata ?? {},
-        },
-        roles: context.roles.map((role) => ({
-          id: role.id,
-          name: role.name,
-        })),
-      },
-    },
-    200,
-    requestId,
-  );
-}
-
-async function handleApiRequest(
-  request: Request,
-  env: Env,
-  requestId: string,
-): Promise<Response> {
-  const url = new URL(request.url);
-  const path = url.pathname;
-  const method = request.method.toUpperCase();
-
-  /*
-   * Public API root
-   */
-  if (
-    path === API_PREFIX ||
-    path === `${API_PREFIX}/`
-  ) {
-    if (method !== "GET") {
-      return methodNotAllowed(
-        requestId,
-        ["GET"],
-      );
-    }
-
-    return json(
-      {
-        name: "WASSLHA API",
-        version: "v1",
-        environment: env.ENVIRONMENT,
-        status: "ok",
-      },
-      200,
-      requestId,
-    );
-  }
-
-  /*
-   * Public health endpoint
-   */
-  if (path === `${API_PREFIX}/health`) {
-    if (method !== "GET") {
-      return methodNotAllowed(
-        requestId,
-        ["GET"],
-      );
-    }
-
-    return json(
-      {
-        status: "ok",
-        service: "wasslha-api",
-        version: "v1",
-        environment: env.ENVIRONMENT,
-        timestamp:
-          new Date().toISOString(),
-        request_id: requestId,
-      },
-      200,
-      requestId,
-    );
-  }
-
-  /*
-   * Public readiness endpoint
-   */
-  if (path === `${API_PREFIX}/ready`) {
-    if (method !== "GET") {
-      return methodNotAllowed(
-        requestId,
-        ["GET"],
-      );
-    }
-
-    const supabaseConfigured =
-      Boolean(env.SUPABASE_URL) &&
-      Boolean(env.SUPABASE_ANON_KEY);
-
-    return json(
-      {
-        status: supabaseConfigured
-          ? "ready"
-          : "degraded",
-        service: "wasslha-api",
-        checks: {
-          api: "ok",
-          supabase: supabaseConfigured
-            ? "configured"
-            : "not_configured",
-        },
-        timestamp:
-          new Date().toISOString(),
-        request_id: requestId,
-      },
-      supabaseConfigured
-        ? 200
-        : 503,
-      requestId,
-    );
-  }
-
-  /*
-   * Authentication + RBAC
-   */
-  if (path === `${API_PREFIX}/auth/me`) {
-    if (method !== "GET") {
-      return methodNotAllowed(
-        requestId,
-        ["GET"],
-      );
-    }
-
-    const context =
-      await createRequestContext(
-        request,
-        env,
-      );
-
-    if (!isAuthenticated(context)) {
-      return unauthorized(
-        requestId,
-        context.error ||
-          "Authentication required",
-      );
-    }
-
-    return authMeResponse(
-      context,
-      requestId,
-    );
-  }
-
-  /*
-   * Future protected API routes.
-   *
-   * Authentication and RBAC will be resolved
-   * before module-specific authorization.
-   */
-  if (
-    path.startsWith(
-      `${API_PREFIX}/`,
-    )
-  ) {
-    const context =
-      await createRequestContext(
-        request,
-        env,
-      );
-
-    if (!isAuthenticated(context)) {
-      return unauthorized(
-        requestId,
-        context.error ||
-          "Authentication required",
-      );
-    }
-
-    if (context.error) {
-      return forbidden(
-        requestId,
-        context.error,
-      );
-    }
-
-    return notFound(requestId);
-  }
-
-  return notFound(requestId);
-}
-
 export default {
-  async fetch(
-    request: Request,
-    env: Env,
-  ): Promise<Response> {
-    const requestId =
-      getRequestId(request);
+  async fetch(request: Request, env: Env): Promise<Response> {
+    const requestId = requestIdOf(request);
 
     try {
-      if (
-        request.method.toUpperCase() ===
-        "OPTIONS"
-      ) {
+      if (request.method.toUpperCase() === "OPTIONS") {
         return withCors(
           new Response(null, {
             status: 204,
             headers: {
-              "X-Request-ID":
-                requestId,
+              "X-Request-ID": requestId,
+              ...getSecurityHeaders(),
             },
           }),
         );
       }
 
-      const response =
-        await handleApiRequest(
-          request,
-          env,
-          requestId,
-        );
-
+      const response = await handle(request, env, requestId);
       return withCors(response);
     } catch (error) {
-      console.error(
-        "Unhandled API error",
-        {
-          requestId,
-          error,
-        },
-      );
+      console.error("Unhandled WASSLHA API error", {
+        requestId,
+        error,
+      });
 
       return withCors(
         json(
           {
+            success: false,
             error: {
-              code:
-                "INTERNAL_SERVER_ERROR",
-              message:
-                "An unexpected error occurred",
+              code: "INTERNAL_SERVER_ERROR",
+              message: "An unexpected error occurred",
             },
-            request_id:
-              requestId,
+            request_id: requestId,
           },
           500,
           requestId,
