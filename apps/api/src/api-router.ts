@@ -22,6 +22,17 @@ function ok<T>(data:T,requestId:string){return successResponse(data,{requestId})
 function fail(code:string,message:string,status:number,requestId:string){return errorResponse({code,message,status},requestId)}
 
 export async function routeApi(request:Request,env:unknown,requestId:string):Promise<Response>{
+ const u=new URL(request.url), publicPath=u.pathname.replace(/^\/api\/v1\/?/,"").split("/").filter(Boolean);
+ const publicMethod=request.method.toUpperCase();
+ const publicToken=tokenOf(request);
+ if(publicMethod==="GET"){
+  if(publicPath[0]==="categories")return ok(await getCategories(env as any,publicToken),requestId);
+  if(publicPath[0]==="products"&&publicPath[1])return ok(await getProduct(publicPath[1],env as any,publicToken),requestId);
+  if(publicPath[0]==="stores"&&publicPath[1])return ok(await getStore(publicPath[1],env as any,publicToken),requestId);
+  if(publicPath[0]==="merchants"&&publicPath[1])return ok(await getMerchant(publicPath[1],env as any,publicToken),requestId);
+  if(publicPath[0]==="promotions")return ok(await getActivePromotions(env as any,publicToken),requestId);
+  if(publicPath[0]==="reviews")return ok(await getPublishedReviews(env as any,publicToken,u.searchParams.get("merchant_id")??undefined),requestId);
+ }
  const context=await createRequestContext(request,env as Parameters<typeof createRequestContext>[1]);
  if(!isAuthenticated(context))return fail("UNAUTHORIZED",context.error??"Authentication required",401,requestId);
  const token=tokenOf(request),uid=context.user!.id,u=new URL(request.url);
