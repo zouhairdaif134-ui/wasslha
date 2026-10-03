@@ -18,7 +18,13 @@ declare
     v_day_end timestamptz;
     v_result jsonb;
 begin
-    if not public.has_role(p_admin_user_id, 'admin') then
+    if not exists (
+        select 1
+        from public.user_roles ur
+        join public.roles r on r.id = ur.role_id
+        where ur.user_id = p_admin_user_id
+          and r.code = 'admin'
+    ) then
         raise exception 'ADMIN_REQUIRED';
     end if;
 
