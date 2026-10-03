@@ -19,7 +19,7 @@ export interface WalletServiceEnv
 export interface Wallet {
   id: string;
   user_id: string;
-  balance_minor: number;
+  balance_minor: string;
   currency: string;
   status?: string | null;
   created_at?: string;
@@ -30,11 +30,15 @@ export interface WalletTransaction {
   id: string;
   wallet_id: string;
   transaction_type?: string | null;
-  amount_minor?: number | null;
-  balance_after_minor?: number | null;
+  amount_minor?: string | null;
+  balance_before_minor?: string | null;
+  balance_after_minor?: string | null;
   currency?: string | null;
   reference_type?: string | null;
   reference_id?: string | null;
+  idempotency_key?: string;
+  description?: string | null;
+  metadata?: Record<string, unknown> | null;
   created_at?: string;
 }
 
@@ -118,7 +122,7 @@ export async function getWalletBalance(
   env: WalletServiceEnv,
   accessToken: string,
 ): Promise<
-  WalletServiceResult<number | null>
+  WalletServiceResult<string | null>
 > {
   const wallet =
     await getUserWallet(
