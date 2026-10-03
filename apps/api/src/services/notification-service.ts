@@ -19,14 +19,12 @@ export interface NotificationServiceEnv
 export interface Notification {
   id: string;
   user_id: string;
-  type?: string | null;
-  title?: string | null;
-  body?: string | null;
+  notification_type: string;
+  title: string;
+  body: string;
   data?: Record<string, unknown> | null;
-  is_read?: boolean;
   read_at?: string | null;
   created_at?: string;
-  updated_at?: string;
 }
 
 export interface NotificationServiceResult<T> {
@@ -83,7 +81,7 @@ export async function getUnreadNotifications(
         `&user_id=eq.${encodeURIComponent(
           userId,
         )}` +
-        `&is_read=eq.false` +
+        `&status=neq.read` +
         `&order=created_at.desc`,
       env,
       accessToken,
@@ -123,7 +121,7 @@ export async function markNotificationAsRead(
         )}`,
       env,
       {
-        is_read: true,
+        status: "read",
         read_at:
           new Date().toISOString(),
       },
