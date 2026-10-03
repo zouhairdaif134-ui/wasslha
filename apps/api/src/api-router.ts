@@ -1,9 +1,9 @@
 import { createRequestContext,isAuthenticated } from "./lib/request-context";
 import { errorResponse,successResponse } from "./lib/response";
 import { getCategories } from "./services/category-service";
-import { getStoreProducts,getProduct } from "./services/product-service";
+import { getProduct } from "./services/product-service";
 import { getMerchant,getMerchantByOwner } from "./services/merchant-service";
-import { getMerchantStores,getStore } from "./services/store-service";
+import { getStore } from "./services/store-service";
 import { getCustomerOrders,getOrder,getOrderSubOrders,getOrderStatusHistory } from "./services/order-service";
 import { getDeliveryByOrder,getRiderDeliveries,getDeliveryAssignments } from "./services/delivery-service";
 import { getRider,getRiderVehicles } from "./services/rider-service";
@@ -15,57 +15,69 @@ import { getMerchantSettlements,getRiderEarnings,getRiderWithdrawals,getOrderRef
 import { getActivePromotions,getPromoCode,getLoyaltyAccount,getUserReferrals } from "./services/growth-service";
 import { getMyTickets,getMyComplaints,getPublishedReviews,getReviewReplies } from "./services/support-service";
 import { getMyRequests,getRequest,getRequestItems,getRequestOffers } from "./services/get-request-service";
+import { getMessages,getConversations,getNotificationPreferences } from "./services/communication-service";
 
-function bearer(request:Request){const v=request.headers.get("Authorization")??"";return v.startsWith("Bearer ")?v.slice(7):""}
-export async function routeApi(request:Request,env:any,requestId:string):Promise<Response>{
- const context=await createRequestContext(request,env); const token=bearer(request);
- if(!isAuthenticated(context))return errorResponse({code:"UNAUTHORIZED",message:context.error??"Authentication required",status:401},{requestId});
- const u=new URL(request.url); const p=u.pathname.replace(/^\/api\/v1\/?/,"").split("/"); const m=request.method.toUpperCase(); const id=p[1];
- const uid=context.user!.id;
+function tokenOf(request:Request){const value=request.headers.get("Authorization")??"";return value.startsWith("Bearer ")?value.slice(7):""}
+function ok<T>(data:T,requestId:string){return successResponse(data,{requestId})}
+function fail(code:string,message:string,status:number,requestId:string){return errorResponse({code,message,status},requestId)}
+
+export async function routeApi(request:Request,env:unknown,requestId:string):Promise<Response>{
+ const context=await createRequestContext(request,env as Parameters<typeof createRequestContext>[1]);
+ if(!isAuthenticated(context))return fail("UNAUTHORIZED",context.error??"Authentication required",401,requestId);
+ const token=tokenOf(request),uid=context.user!.id,u=new URL(request.url);
+ const p=u.pathname.replace(/^\/api\/v1\/?/,"").split("/").filter(Boolean),m=request.method.toUpperCase(),id=p[1];
  try{
-  if(p[0]==="categories"&&m==="GET")return successResponse(await getCategories(env,token),requestId);
-  if(p[0]==="products"&&m==="GET"&&id)return successResponse(await getProduct(id,env,token),requestId);
-  if(p[0]==="stores"&&m==="GET"&&id)return successResponse(await getStore(id,env,token),requestId);
-  if(p[0]==="merchants"&&m==="GET"&&id)return successResponse(await getMerchant(id,env,token),requestId);
-  if(p[0]==="merchant"&&p[1]==="me"&&m==="GET")return successResponse(await getMerchantByOwner(uid,env,token),requestId);
-  if(p[0]==="orders"&&m==="GET"&&!id)return successResponse(await getCustomerOrders(uid,env,token),requestId);
-  if(p[0]==="orders"&&m==="GET"&&id&&p[2]==="suborders")return successResponse(await getOrderSubOrders(id,env,token),{requestId});
-  if(p[0]==="orders"&&m==="GET"&&id&&p[2]==="history")return successResponse(await getOrderStatusHistory(id,env,token),requestId);
-  if(p[0]==="orders"&&m==="GET"&&id&&p[2]==="payment")return successResponse(await getPaymentByOrder(id,env,token),{requestId});
-  if(p[0]==="orders"&&m==="GET"&&id&&p[2]==="delivery")return successResponse(await getDeliveryByOrder(id,env,token),{requestId});
-  if(p[0]==="orders"&&m==="GET"&&id&&p[2]==="refunds")return successResponse(await getOrderRefunds(id,env,token),{requestId});
-  if(p[0]==="orders"&&m==="GET"&&id)return successResponse(await getOrder(id,env,token),{requestId});
-  if(p[0]==="orders"&&m==="GET"&&id&&p[2]==="payment")return successResponse(await getPaymentByOrder(id,env,token),requestId);
-  if(p[0]==="deliveries"&&m==="GET"&&id&&p[2]==="assignments")return successResponse(await getDeliveryAssignments(id,env,token),requestId);
-  if(p[0]==="orders"&&m==="GET"&&id&&p[2]==="delivery")return successResponse(await getDeliveryByOrder(id,env,token),requestId);
-  if(p[0]==="rider"&&p[1]==="me"&&p[2]==="deliveries"&&m==="GET")return successResponse(await getRiderDeliveries(uid,env,token),requestId);
-  if(p[0]==="rider"&&p[1]==="me"&&m==="GET")return successResponse(await getRider(uid,env,token),requestId);
-  if(p[0]==="rider"&&p[1]==="me"&&p[2]==="vehicles"&&m==="GET")return successResponse(await getRiderVehicles(uid,env,token),requestId);
-  if(p[0]==="payments"&&m==="GET")return successResponse(await getCustomerPayments(uid,env,token),requestId);
-  if(p[0]==="payments"&&m==="GET"&&id)return successResponse(await getPaymentTransactions(id,env,token),requestId);
-  if(p[0]==="wallet"&&p[1]==="me"&&m==="GET")return successResponse(await getUserWallet(uid,env,token),requestId);
-  if(p[0]==="wallet"&&p[1]==="me"&&p[2]==="transactions"&&m==="GET")return successResponse(await getWalletTransactions(uid,env,token),requestId);
-  if(p[0]==="notifications"&&m==="GET")return successResponse(await getUserNotifications(uid,env,token),requestId);
-  if(p[0]==="notifications"&&m==="PATCH"&&id&&p[2]==="read")return successResponse(await markNotificationAsRead(id,env,token),requestId);
-  if(p[0]==="rider-slots"&&m==="GET")return successResponse(await getOpenRiderSlots(env,token),requestId);
-  if(p[0]==="rider"&&p[1]==="me"&&p[2]==="waitlist"&&m==="GET")return successResponse(await getRiderWaitlist(uid,env,token),requestId);
-  if(p[0]==="rider"&&p[1]==="me"&&p[2]==="attendance"&&m==="GET")return successResponse(await getRiderAttendance(uid,env,token),requestId);
-  if(p[0]==="finance"&&p[1]==="settlements"&&m==="GET")return successResponse(await getMerchantSettlements(uid,env,token),requestId);
-  if(p[0]==="rider"&&p[1]==="me"&&p[2]==="earnings"&&m==="GET")return successResponse(await getRiderEarnings(uid,env,token),requestId);
-  if(p[0]==="rider"&&p[1]==="me"&&p[2]==="withdrawals"&&m==="GET")return successResponse(await getRiderWithdrawals(uid,env,token),requestId);
-  if(p[0]==="orders"&&m==="GET"&&id&&p[2]==="refunds")return successResponse(await getOrderRefunds(id,env,token),requestId);
-  if(p[0]==="promotions"&&m==="GET")return successResponse(await getActivePromotions(env,token),requestId);
-  if(p[0]==="promo-codes"&&m==="GET"&&id)return successResponse(await getPromoCode(id,env,token),requestId);
-  if(p[0]==="loyalty"&&p[1]==="me"&&m==="GET")return successResponse(await getLoyaltyAccount(uid,env,token),requestId);
-  if(p[0]==="referrals"&&p[1]==="me"&&m==="GET")return successResponse(await getUserReferrals(uid,env,token),requestId);
-  if(p[0]==="support"&&p[1]==="tickets"&&m==="GET")return successResponse(await getMyTickets(uid,env,token),requestId);
-  if(p[0]==="support"&&p[1]==="complaints"&&m==="GET")return successResponse(await getMyComplaints(uid,env,token),requestId);
-  if(p[0]==="reviews"&&m==="GET")return successResponse(await getPublishedReviews(env,token,u.searchParams.get("merchant_id")??undefined),requestId);
-  if(p[0]==="reviews"&&m==="GET"&&id&&p[2]==="replies")return successResponse(await getReviewReplies(id,env,token),requestId);
-  if(p[0]==="get-requests"&&m==="GET")return successResponse(await getMyRequests(uid,env,token),requestId);
-  if(p[0]==="get-requests"&&m==="GET"&&id&&p[2]==="items")return successResponse(await getRequestItems(id,env,token),requestId);
-  if(p[0]==="get-requests"&&m==="GET"&&id&&p[2]==="offers")return successResponse(await getRequestOffers(id,env,token),requestId);
-  if(p[0]==="get-requests"&&m==="GET"&&id)return successResponse(await getRequest(id,env,token),requestId);
-  return errorResponse({code:"NOT_FOUND",message:"API route not found",status:404},requestId);
- }catch(error){console.error("API route error",{requestId,error});return errorResponse({code:"INTERNAL_SERVER_ERROR",message:"An unexpected error occurred",status:500},requestId)}
+  if(p[0]==="categories"&&m==="GET")return ok(await getCategories(env as any,token),requestId);
+  if(p[0]==="products"&&m==="GET"&&id)return ok(await getProduct(id,env as any,token),requestId);
+  if(p[0]==="stores"&&m==="GET"&&id)return ok(await getStore(id,env as any,token),requestId);
+  if(p[0]==="merchants"&&m==="GET"&&id)return ok(await getMerchant(id,env as any,token),requestId);
+  if(p[0]==="merchant"&&id==="me"&&m==="GET")return ok(await getMerchantByOwner(uid,env as any,token),requestId);
+
+  if(p[0]==="orders"&&m==="GET"&&id&&p[2]==="suborders")return ok(await getOrderSubOrders(id,env as any,token),requestId);
+  if(p[0]==="orders"&&m==="GET"&&id&&p[2]==="history")return ok(await getOrderStatusHistory(id,env as any,token),requestId);
+  if(p[0]==="orders"&&m==="GET"&&id&&p[2]==="payment")return ok(await getPaymentByOrder(id,env as any,token),requestId);
+  if(p[0]==="orders"&&m==="GET"&&id&&p[2]==="delivery")return ok(await getDeliveryByOrder(id,env as any,token),requestId);
+  if(p[0]==="orders"&&m==="GET"&&id&&p[2]==="refunds")return ok(await getOrderRefunds(id,env as any,token),requestId);
+  if(p[0]==="orders"&&m==="GET"&&id)return ok(await getOrder(id,env as any,token),requestId);
+  if(p[0]==="orders"&&m==="GET")return ok(await getCustomerOrders(uid,env as any,token),requestId);
+
+  if(p[0]==="deliveries"&&m==="GET"&&id&&p[2]==="assignments")return ok(await getDeliveryAssignments(id,env as any,token),requestId);
+  if(p[0]==="rider"&&id==="me"&&p[2]==="deliveries"&&m==="GET")return ok(await getRiderDeliveries(uid,env as any,token),requestId);
+  if(p[0]==="rider"&&id==="me"&&p[2]==="vehicles"&&m==="GET")return ok(await getRiderVehicles(uid,env as any,token),requestId);
+  if(p[0]==="rider"&&id==="me"&&p[2]==="waitlist"&&m==="GET")return ok(await getRiderWaitlist(uid,env as any,token),requestId);
+  if(p[0]==="rider"&&id==="me"&&p[2]==="attendance"&&m==="GET")return ok(await getRiderAttendance(uid,env as any,token),requestId);
+  if(p[0]==="rider"&&id==="me"&&p[2]==="earnings"&&m==="GET")return ok(await getRiderEarnings(uid,env as any,token),requestId);
+  if(p[0]==="rider"&&id==="me"&&p[2]==="withdrawals"&&m==="GET")return ok(await getRiderWithdrawals(uid,env as any,token),requestId);
+  if(p[0]==="rider"&&id==="me"&&m==="GET")return ok(await getRider(uid,env as any,token),requestId);
+  if(p[0]==="rider-slots"&&m==="GET")return ok(await getOpenRiderSlots(env as any,token),requestId);
+
+  if(p[0]==="payments"&&m==="GET"&&id&&p[2]==="transactions")return ok(await getPaymentTransactions(id,env as any,token),requestId);
+  if(p[0]==="payments"&&m==="GET")return ok(await getCustomerPayments(uid,env as any,token),requestId);
+  if(p[0]==="wallet"&&id==="me"&&p[2]==="transactions"&&m==="GET")return ok(await getWalletTransactions(uid,env as any,token),requestId);
+  if(p[0]==="wallet"&&id==="me"&&m==="GET")return ok(await getUserWallet(uid,env as any,token),requestId);
+  if(p[0]==="notifications"&&m==="PATCH"&&id&&p[2]==="read")return ok(await markNotificationAsRead(id,env as any,token),requestId);
+  if(p[0]==="notifications"&&m==="GET")return ok(await getUserNotifications(uid,env as any,token),requestId);
+
+  if(p[0]==="finance"&&id==="settlements"&&m==="GET")return ok(await getMerchantSettlements(uid,env as any,token),requestId);
+  if(p[0]==="promotions"&&m==="GET")return ok(await getActivePromotions(env as any,token),requestId);
+  if(p[0]==="promo-codes"&&m==="GET"&&id)return ok(await getPromoCode(id,env as any,token),requestId);
+  if(p[0]==="loyalty"&&id==="me"&&m==="GET")return ok(await getLoyaltyAccount(uid,env as any,token),requestId);
+  if(p[0]==="referrals"&&id==="me"&&m==="GET")return ok(await getUserReferrals(uid,env as any,token),requestId);
+
+  if(p[0]==="support"&&id==="tickets"&&m==="GET")return ok(await getMyTickets(uid,env as any,token),requestId);
+  if(p[0]==="support"&&id==="complaints"&&m==="GET")return ok(await getMyComplaints(uid,env as any,token),requestId);
+  if(p[0]==="reviews"&&m==="GET"&&id&&p[2]==="replies")return ok(await getReviewReplies(id,env as any,token),requestId);
+  if(p[0]==="reviews"&&m==="GET")return ok(await getPublishedReviews(env as any,token,u.searchParams.get("merchant_id")??undefined),requestId);
+
+  if(p[0]==="get-requests"&&m==="GET"&&id&&p[2]==="items")return ok(await getRequestItems(id,env as any,token),requestId);
+  if(p[0]==="get-requests"&&m==="GET"&&id&&p[2]==="offers")return ok(await getRequestOffers(id,env as any,token),requestId);
+  if(p[0]==="get-requests"&&m==="GET"&&id)return ok(await getRequest(id,env as any,token),requestId);
+  if(p[0]==="get-requests"&&m==="GET")return ok(await getMyRequests(uid,env as any,token),requestId);
+
+  if(p[0]==="conversations"&&m==="GET"&&id&&p[2]==="messages")return ok(await getMessages(id,env as any,token),requestId);
+  if(p[0]==="conversations"&&m==="GET")return ok(await getConversations(uid,env as any,token),requestId);
+  if(p[0]==="notification-preferences"&&m==="GET")return ok(await getNotificationPreferences(uid,env as any,token),requestId);
+
+  return fail("NOT_FOUND","API route not found",404,requestId);
+ }catch(error){console.error("API route error",{requestId,error});return fail("INTERNAL_SERVER_ERROR","An unexpected error occurred",500,requestId)}
 }
