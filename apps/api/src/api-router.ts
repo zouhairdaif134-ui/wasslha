@@ -35,7 +35,7 @@ export async function routeApi(request:Request,env:unknown,requestId:string):Pro
  }
  const context=await createRequestContext(request,env as Parameters<typeof createRequestContext>[1]);
  if(!isAuthenticated(context))return fail("UNAUTHORIZED",context.error??"Authentication required",401,requestId);
- const token=tokenOf(request),uid=context.user!.id,u=new URL(request.url);
+ const token=tokenOf(request),uid=context.user!.id;
  const p=u.pathname.replace(/^\/api\/v1\/?/,"").split("/").filter(Boolean),m=request.method.toUpperCase(),id=p[1];
  try{
   if(p[0]==="categories"&&m==="GET")return ok(await getCategories(env as any,token),requestId);
@@ -66,7 +66,7 @@ export async function routeApi(request:Request,env:unknown,requestId:string):Pro
   if(p[0]==="payments"&&m==="GET")return ok(await getCustomerPayments(uid,env as any,token),requestId);
   if(p[0]==="wallet"&&id==="me"&&p[2]==="transactions"&&m==="GET")return ok(await getWalletTransactions(uid,env as any,token),requestId);
   if(p[0]==="wallet"&&id==="me"&&m==="GET")return ok(await getUserWallet(uid,env as any,token),requestId);
-  if(p[0]==="notifications"&&m==="PATCH"&&id&&p[2]==="read")return ok(await markNotificationAsRead(id,env as any,token),requestId);
+  if(p[0]==="notifications"&&m==="PATCH"&&id&&p[2]==="read")return ok(await markNotificationAsRead(id,uid,env as any,token),requestId);
   if(p[0]==="notifications"&&m==="GET")return ok(await getUserNotifications(uid,env as any,token),requestId);
 
   if(p[0]==="finance"&&id==="settlements"&&m==="GET")return ok(await getMerchantSettlements(uid,env as any,token),requestId);
