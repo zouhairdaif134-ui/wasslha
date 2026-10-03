@@ -27,6 +27,7 @@ export interface Env {
   GOOGLE_MAPS_API_KEY?: string;
   TELEGRAM_BOT_TOKEN?: string;
   PAYMENT_SECRET_KEY?: string;
+  ALLOWED_ORIGINS?: string;
   API_RATE_LIMITER?: {
     limit(input: { key: string }): Promise<{ success: boolean }>;
   };
@@ -43,9 +44,17 @@ function requestIdOf(request: Request): string {
     : crypto.randomUUID();
 }
 
-function withCors(response: Response): Response {
+function allowedOrigin(requestOrigin: string | null, env: Env): string {
+  const configured = (env.ALLOWED_ORIGINS ?? "").split(",").map((v) => v.trim()).filter(Boolean);
+  if (!requestOrigin) return configured[0] ?? "*";
+  if (configured.length === 0) return "*";
+  return configured.includes(requestOrigin) ? requestOrigin : "null";
+}
+
+function withCors(response: Response, env: Env, requestOrigin: string | null): Response {
   const headers = new Headers(response.headers);
-  headers.set("Access-Control-Allow-Origin", "*");
+  headers.set("Access-Control-Allow-Origin", allowedOrigin(requestOrigin, env));
+  headers.set("Vary", "Origin");
   headers.set(
     "Access-Control-Allow-Methods",
     "GET,POST,PUT,PATCH,DELETE,OPTIONS",
@@ -55,6 +64,7 @@ function withCors(response: Response): Response {
     "Content-Type, Authorization, X-Request-ID, Idempotency-Key",
   );
   headers.set("Access-Control-Max-Age", "86400");
+  headers.set("Access-Control-Expose-Headers", "X-Request-ID");
 
   for (const [name, value] of Object.entries(getSecurityHeaders())) {
     headers.set(name, value);
@@ -211,11 +221,13 @@ export default {
               ...getSecurityHeaders(),
             },
           }),
+          env,
+          request.headers.get("Origin"),
         );
       }
 
       const response = await handle(request, env, requestId);
-      return withCors(response);
+      return withCors(response, env, request.headers.get("Origin"));
     } catch (error) {
       console.error("Unhandled WASSLHA API error", {
         requestId,
@@ -235,6 +247,8 @@ export default {
           500,
           requestId,
         ),
+        env,
+        request.headers.get("Origin"),
       );
     }
   },
