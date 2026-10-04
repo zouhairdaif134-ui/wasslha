@@ -82,77 +82,10 @@ export async function createOrder(
     },
   );
 
-  return {
-    success: !result.error,
-    data: result.data,
-    error: result.error,
-  };
+  return { success: !result.error, data: result.data, error: result.error };
 }
 
-export async function getCustomerOrders(
-  customerId: string,
-  env: OrderServiceEnv,
-  accessToken: string,
-): Promise<OrderServiceResult<MasterOrder[]>> {
-  const result = await databaseGet<MasterOrder[]>(
-    `/rest/v1/master_orders?select=*&customer_id=eq.${encodeURIComponent(customerId)}&order=created_at.desc`,
-    env,
-    accessToken,
-  );
-  return {
-    success: !result.error,
-    data: result.data ?? [],
-    error: result.error,
-  };
-}
-
-export async function getOrder(
-  orderId: string,
-  env: OrderServiceEnv,
-  accessToken: string,
-): Promise<OrderServiceResult<MasterOrder | null>> {
-  const result = await databaseGet<MasterOrder[]>(
-    `/rest/v1/master_orders?select=*&id=eq.${encodeURIComponent(orderId)}&limit=1`,
-    env,
-    accessToken,
-  );
-  return {
-    success: !result.error,
-    data: result.data?.[0] ?? null,
-    error: result.error,
-  };
-}
-
-export async function getOrderSubOrders(
-  orderId: string,
-  env: OrderServiceEnv,
-  accessToken: string,
-): Promise<OrderServiceResult<SubOrder[]>> {
-  const result = await databaseGet<SubOrder[]>(
-    `/rest/v1/sub_orders?select=*&master_order_id=eq.${encodeURIComponent(orderId)}&order=created_at.asc`,
-    env,
-    accessToken,
-  );
-  return {
-    success: !result.error,
-    data: result.data ?? [],
-    error: result.error,
-  };
-}
-
-export async function getOrderStatusHistory(
-  orderId: string,
-  env: OrderServiceEnv,
-  accessToken: string,
-): Promise<OrderServiceResult<Array<Record<string, unknown>>>> {
-  const result = await databaseGet<Array<Record<string, unknown>>>(
-    `/rest/v1/order_status_history?select=*&master_order_id=eq.${encodeURIComponent(orderId)}&order=created_at.asc`,
-    env,
-    accessToken,
-  );
-  return {
-    success: !result.error,
-    data: result.data ?? [],
-    error: result.error,
-  };
-}
+export async function getCustomerOrders(customerId:string,env:OrderServiceEnv,accessToken:string):Promise<OrderServiceResult<MasterOrder[]>>{const result=await databaseGet<MasterOrder[]>(`/rest/v1/master_orders?select=*&customer_id=eq.${encodeURIComponent(customerId)}&order=created_at.desc`,env,accessToken);return{success:!result.error,data:result.data??[],error:result.error};}
+export async function getOrder(orderId:string,env:OrderServiceEnv,accessToken:string):Promise<OrderServiceResult<MasterOrder|null>>{const result=await databaseGet<MasterOrder[]>(`/rest/v1/master_orders?select=*&id=eq.${encodeURIComponent(orderId)}&limit=1`,env,accessToken);return{success:!result.error,data:result.data?.[0]??null,error:result.error};}
+export async function getOrderSubOrders(orderId:string,env:OrderServiceEnv,accessToken:string):Promise<OrderServiceResult<SubOrder[]>>{const result=await databaseGet<SubOrder[]>(`/rest/v1/sub_orders?select=*&master_order_id=eq.${encodeURIComponent(orderId)}&order=created_at.asc`,env,accessToken);return{success:!result.error,data:result.data??[],error:result.error};}
+export async function getOrderStatusHistory(orderId:string,env:OrderServiceEnv,accessToken:string):Promise<OrderServiceResult<Array<Record<string,unknown>>>>{const result=await databaseGet<Array<Record<string,unknown>>>(`/rest/v1/order_status_history?select=*&master_order_id=eq.${encodeURIComponent(orderId)}&order=created_at.asc`,env,accessToken);return{success:!result.error,data:result.data??[],error:result.error};}
