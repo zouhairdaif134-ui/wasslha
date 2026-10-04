@@ -20,7 +20,7 @@ import { getAuthenticatedSession } from "./services/auth-service";
 import { authorize } from "./lib/authorization";
 import { PERMISSIONS } from "./lib/permissions";
 import { getAdminDashboardOverview } from "./services/admin-dashboard-service";
-import { getAdminOrders, getAdminMerchants, getAdminRiders, getAdminFinance, getAdminSupport, getAdminUsers, getAdminAudit } from "./services/admin-operational-service";
+import { getAdminOrders,getAdminMerchants,getAdminRiders,getAdminFinance,getAdminSupport,getAdminUsers,getAdminAudit } from "./services/admin-operational-service";
 import { getMerchantDashboard } from "./services/merchant-dashboard-service";
 import { getAdminGovernanceOverview } from "./services/admin-governance-service";
 
@@ -30,8 +30,7 @@ function fail(code:string,message:string,status:number,requestId:string){return 
 function guard(context:Parameters<typeof authorize>[0],permission:Parameters<typeof authorize>[1],requestId:string){const decision=authorize(context,permission);return decision.allowed?null:fail("FORBIDDEN",decision.reason??"Permission denied",403,requestId)}
 
 export async function routeApi(request:Request,env:unknown,requestId:string):Promise<Response>{
- const u=new URL(request.url), publicPath=u.pathname.replace(/^\/api\/v1\/?/,"").split("/").filter(Boolean);
- const publicMethod=request.method.toUpperCase(),publicToken=tokenOf(request);
+ const u=new URL(request.url),publicPath=u.pathname.replace(/^\/api\/v1\/?/,"").split("/").filter(Boolean),publicMethod=request.method.toUpperCase(),publicToken=tokenOf(request);
  if(publicMethod==="GET"){
   if(publicPath[0]==="categories")return ok(await getCategories(env as any,publicToken),requestId);
   if(publicPath[0]==="products"&&publicPath[1])return ok(await getPublicProduct(publicPath[1],env as any,publicToken),requestId);
@@ -42,8 +41,7 @@ export async function routeApi(request:Request,env:unknown,requestId:string):Pro
  }
  const context=await createRequestContext(request,env as Parameters<typeof createRequestContext>[1]);
  if(!isAuthenticated(context))return fail("UNAUTHORIZED",context.error??"Authentication required",401,requestId);
- const token=tokenOf(request),uid=context.user!.id;
- const p=u.pathname.replace(/^\/api\/v1\/?/,"").split("/").filter(Boolean),m=request.method.toUpperCase(),id=p[1];
+ const token=tokenOf(request),uid=context.user!.id,p=u.pathname.replace(/^\/api\/v1\/?/,"").split("/").filter(Boolean),m=request.method.toUpperCase(),id=p[1];
 
  if(p[0]==="admin"&&p[1]==="orders"&&m==="GET"){const denied=guard(context,PERMISSIONS.ADMIN_ORDERS_READ,requestId);if(denied)return denied;const result=await getAdminOrders(uid,u.searchParams.get("status"),Number(u.searchParams.get("limit")??50),Number(u.searchParams.get("offset")??0),env as any);if(result.error)return fail("ADMIN_ORDERS_ERROR",result.error,502,requestId);return ok(result.data,requestId)}
  if(p[0]==="admin"&&p[1]==="merchants"&&m==="GET"){const denied=guard(context,PERMISSIONS.ADMIN_MERCHANTS_READ,requestId);if(denied)return denied;const result=await getAdminMerchants(uid,u.searchParams.get("status"),Number(u.searchParams.get("limit")??50),Number(u.searchParams.get("offset")??0),env as any);if(result.error)return fail("ADMIN_MERCHANTS_ERROR",result.error,502,requestId);return ok(result.data,requestId)}
@@ -51,7 +49,7 @@ export async function routeApi(request:Request,env:unknown,requestId:string):Pro
  if(p[0]==="admin"&&p[1]==="finance"&&m==="GET"){const denied=guard(context,PERMISSIONS.ADMIN_FINANCE_READ,requestId);if(denied)return denied;const result=await getAdminFinance(uid,u.searchParams.get("kind")??"payments",Number(u.searchParams.get("limit")??50),Number(u.searchParams.get("offset")??0),env as any);if(result.error)return fail("ADMIN_FINANCE_ERROR",result.error,502,requestId);return ok(result.data,requestId)}
  if(p[0]==="admin"&&p[1]==="support"&&m==="GET"){const denied=guard(context,PERMISSIONS.ADMIN_SUPPORT_READ,requestId);if(denied)return denied;const result=await getAdminSupport(uid,u.searchParams.get("kind")??"tickets",Number(u.searchParams.get("limit")??50),Number(u.searchParams.get("offset")??0),env as any);if(result.error)return fail("ADMIN_SUPPORT_ERROR",result.error,502,requestId);return ok(result.data,requestId)}
  if(p[0]==="admin"&&p[1]==="users"&&m==="GET"){const denied=guard(context,PERMISSIONS.ADMIN_USERS_READ,requestId);if(denied)return denied;const result=await getAdminUsers(uid,Number(u.searchParams.get("limit")??50),Number(u.searchParams.get("offset")??0),env as any);if(result.error)return fail("ADMIN_USERS_ERROR",result.error,502,requestId);return ok(result.data,requestId)}
- if(p[0]==="admin"&&p[1]==="audit"&&m==="GET"){const denied=guard(context,PERMISSIONS.ADMIN_AUDIT_READ,requestId);if(denied)return denied;const result=await getAdminAudit(uid,Number(u.searchParams.get("limit")??100),Number(u.searchParams.get("offset")??0),env as any);if(result.error)return fail("ADMIN_AUDIT_ERROR",result.error,502,requestId)}
+ if(p[0]==="admin"&&p[1]==="audit"&&m==="GET"){const denied=guard(context,PERMISSIONS.ADMIN_AUDIT_READ,requestId);if(denied)return denied;const result=await getAdminAudit(uid,Number(u.searchParams.get("limit")??100),Number(u.searchParams.get("offset")??0),env as any);if(result.error)return fail("ADMIN_AUDIT_ERROR",result.error,502,requestId);return ok(result.data,requestId)}
  if(p[0]==="admin"&&p[1]==="governance"&&m==="GET"){const denied=guard(context,PERMISSIONS.ADMIN_SETTINGS_READ,requestId);if(denied)return denied;const result=await getAdminGovernanceOverview(uid,env as any);if(result.error)return fail("ADMIN_GOVERNANCE_ERROR",result.error,502,requestId);return ok(result.data,requestId)}
  if(p[0]==="admin"&&p[1]==="overview"&&m==="GET"){const denied=guard(context,PERMISSIONS.ADMIN_DASHBOARD_VIEW,requestId);if(denied)return denied;const result=await getAdminDashboardOverview(uid,env as any);if(result.error)return fail("ADMIN_DASHBOARD_ERROR",result.error,502,requestId);return ok(result.data,requestId)}
  if(p[0]==="auth"&&p[1]==="me"&&m==="GET"){const session=await getAuthenticatedSession(request,env as any);if(!session.success||!session.session)return fail("UNAUTHORIZED",session.error??"Authentication required",401,requestId);return ok({user:session.session.user,roles:session.session.roles,admin:context.roles.some(r=>r.name==="admin")},requestId)}
