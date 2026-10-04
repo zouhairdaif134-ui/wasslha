@@ -134,6 +134,21 @@ export async function getRiderDeliveries(
   };
 }
 
+
+export async function getRiderAssignments(
+  riderId: string,
+  env: DeliveryServiceEnv,
+  accessToken: string,
+): Promise<DeliveryServiceResult<DeliveryAssignment[]>> {
+  const result = await databaseGet<DeliveryAssignment[]>(
+    `/rest/v1/delivery_assignments?select=*&rider_id=eq.${encodeURIComponent(riderId)}&status=in.(offered,accepted)&order=created_at.desc`,
+    env,
+    accessToken,
+  );
+  if (result.error) return { success: false, data: null, error: result.error };
+  return { success: true, data: result.data ?? [], error: null };
+}
+
 export async function getDeliveryAssignments(
   deliveryId: string,
   env: DeliveryServiceEnv,
