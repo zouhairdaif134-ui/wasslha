@@ -8,6 +8,7 @@
 import { routeApi } from "./api-router";
 import { routeCoreBusiness } from "./core-business-router";
 import { routeOrders } from "./order-router";
+import { routeRider } from "./rider-router";
 import { API_PREFIX } from "./lib/constants";
 import { getSecurityHeaders } from "./lib/security";
 
@@ -71,6 +72,8 @@ async function handle(request: Request, env: Env, requestId: string): Promise<Re
     if (order) return order;
     const core = await routeCoreBusiness(request, env, requestId);
     if (core) return core;
+    const rider = await routeRider(request, env, requestId);
+    if (rider) return rider;
     return routeApi(request, env, requestId);
   }
   return json({ success: false, error: { code: "NOT_FOUND", message: "API route not found" } }, 404, requestId);
