@@ -1,0 +1,67 @@
+import { createRequestContext, isAuthenticated } from "./lib/request-context";
+import { authorize } from "./lib/authorization";
+import { PERMISSIONS } from "./lib/permissions";
+import { errorResponse, successResponse } from "./lib/response";
+import { servicePost, type ServiceAuthEnv } from "./lib/service-client";
+
+function fail(code: string, message: string, status: number, requestId: string) {
+  return errorResponse({ code, message, status }, requestId);
+}
+
+function tokenOf(request: Request) {
+  const value = request.headers.get("Authorization") ?? "";
+  return value.startsWith("Bearer ") ? value.slice(7) : "";
+}
+
+function validDate(value: unknown): value is string {
+  return typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value);
+}
+
+function validTime(value: unknown): value is string {
+  return typeof value === "string" && /^([01]\d|2[0-3]):[0-5]\d$/.test(value);
+}
+
+export async function routeRiderSlotWrites(request: Request, env: unknown, requestId: string): Promise<Response | null> {
+  const url = new URL(request.url);
+  const path = url.pathname.replace(/^\/api\/v1\/?/, "").split("/").filter(Boolean);
+  if (path[0] !== "rider-slots" || path.length !== 1 || request.method.toUpperCase() !== "POST") return null;
+
+  const context = await createRequestContext(request, env as Parameters<typeof createRequestContext>[1]);
+  if (!isAuthenticated(context)) return fail("UNAUTHORIZED", context.error ?? "Authentication required", 401, requestId);
+
+  const decision = authorize(context, PERMISSIONS.RIDER_SLOTS_UPDATE);
+  if (!decision.allowed) return fail("FORBIDDEN", decision.reason ?? "Permission denied", 403, requestId);
+
+  let body: Record<string, unknown>;
+  try {
+    const value = await request.json();
+    body = value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
+  } catch {
+    return fail("VALIDATION_ERROR", "Invalid JSON body", 400, requestId);
+  }
+
+  const slotDate = body.slot_date;
+  const startTime = body.start_time;
+  const endTime = body.end_time;
+  const capacity = body.capacity ?? 1;
+  if (!validDate(slotDate) || !validTime(startTime) || !validTime(endTime) || typeof capacity !== "number" || !Number.isInteger(capacity) || capacity < 1 || capacity > 20) {
+    return fail("VALIDATION_ERROR", "slot_date, start_time, end_time and capacity are invalid", 400, requestId);
+  }
+
+  const result = await servicePost<unknown>("/rest/v1/rpc/rider_create_slot", env as ServiceAuthEnv, {
+    p_rider_id: context.user!.id,
+    p_slot_date: slotDate,
+    p_start_time: `${startTime}:00`,
+    p_end_time: `${endTime}:00`,
+    p_capacity: capacity,
+  });
+  if (result.error) {
+    const message = result.error.includes("SLOT_OVERLAP_OR_REST_VIOLATION")
+      ? "الـ Slot كيتعارض مع Slot آخر أو ما كايناش مدة الراحة الكافية."
+      : result.error.includes("RIDER_NOT_APPROVED")
+        ? "الحساب ديال Rider مازال ما تصادقش عليه الإدارة."
+        : result.error;
+    return fail("RIDER_SLOT_CREATE_ERROR", message, 409, requestId);
+  }
+  return successResponse(Array.isArray(result.data) ? result.data[0] : result.data, { requestId });
+}
