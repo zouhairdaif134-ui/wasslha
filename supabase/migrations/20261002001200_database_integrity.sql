@@ -65,10 +65,10 @@ create index if not exists delivery_assignments_rider_status_idx
         status
     );
 
-create index if not exists rider_locations_rider_created_idx
+create index if not exists rider_locations_rider_recorded_idx
     on public.rider_locations (
         rider_id,
-        created_at desc
+        recorded_at desc
     );
 
 create index if not exists delivery_events_delivery_created_idx
