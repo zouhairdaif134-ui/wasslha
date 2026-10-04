@@ -1,33 +1,26 @@
-/**
- * WASSLHA
- * Order Service
- *
- * Server-side order read operations.
- *
- * Order state transitions will be handled through
- * the dedicated order state-machine service.
- *
- * Berrechid MVP.
- */
+import { databaseGet, type DatabaseEnv } from "../lib/database";
+import { servicePost, type ServiceAuthEnv } from "../lib/service-client";
 
-import {
-  databaseGet,
-  type DatabaseEnv,
-} from "../lib/database";
-
-export interface OrderServiceEnv
-  extends DatabaseEnv {}
+export interface OrderServiceEnv extends DatabaseEnv, ServiceAuthEnv {}
 
 export interface MasterOrder {
   id: string;
   customer_id: string;
+  delivery_address_id: string;
+  order_number: string;
   status?: string | null;
-  subtotal_minor?: number | null;
-  discount_minor?: number | null;
-  delivery_fee_minor?: number | null;
-  total_minor?: number | null;
+  payment_method?: string | null;
+  payment_status?: string | null;
   currency?: string | null;
-  delivery_address_id?: string | null;
+  subtotal_minor?: number | null;
+  delivery_fee_minor?: number | null;
+  discount_minor?: number | null;
+  total_minor?: number | null;
+  customer_note?: string | null;
+  placed_at?: string | null;
+  confirmed_at?: string | null;
+  delivered_at?: string | null;
+  cancelled_at?: string | null;
   created_at?: string;
   updated_at?: string;
 }
@@ -36,10 +29,27 @@ export interface SubOrder {
   id: string;
   master_order_id: string;
   store_id: string;
+  sub_order_number: string;
   status?: string | null;
   subtotal_minor?: number | null;
+  discount_minor?: number | null;
+  total_minor?: number | null;
+  merchant_note?: string | null;
   created_at?: string;
   updated_at?: string;
+}
+
+export interface CreateOrderItemInput {
+  product_id: string;
+  quantity: number;
+  notes?: string;
+}
+
+export interface CreateOrderInput {
+  delivery_address_id: string;
+  payment_method: "cod" | "online";
+  customer_note?: string;
+  items: CreateOrderItemInput[];
 }
 
 export interface OrderServiceResult<T> {
@@ -48,37 +58,51 @@ export interface OrderServiceResult<T> {
   error: string | null;
 }
 
+export async function createOrder(
+  customerId: string,
+  input: CreateOrderInput,
+  idempotencyKey: string,
+  env: OrderServiceEnv,
+): Promise<OrderServiceResult<{ replayed: boolean; order: MasterOrder }>> {
+  const result = await servicePost<{
+    replayed: boolean;
+    order: MasterOrder;
+  }>(
+    "/rest/v1/rpc/create_master_order",
+    env,
+    {
+      p_customer_id: customerId,
+      p_delivery_address_id: input.delivery_address_id,
+      p_payment_method: input.payment_method,
+      p_customer_note: input.customer_note ?? null,
+      p_idempotency_key: idempotencyKey,
+      p_items: input.items,
+      p_delivery_fee_minor: 0,
+      p_discount_minor: 0,
+    },
+  );
+
+  return {
+    success: !result.error,
+    data: result.data,
+    error: result.error,
+  };
+}
+
 export async function getCustomerOrders(
   customerId: string,
   env: OrderServiceEnv,
   accessToken: string,
-): Promise<
-  OrderServiceResult<MasterOrder[]>
-> {
-  const result =
-    await databaseGet<MasterOrder[]>(
-      `/rest/v1/master_orders` +
-        `?select=*` +
-        `&customer_id=eq.${encodeURIComponent(
-          customerId,
-        )}` +
-        `&order=created_at.desc`,
-      env,
-      accessToken,
-    );
-
-  if (result.error) {
-    return {
-      success: false,
-      data: null,
-      error: result.error,
-    };
-  }
-
+): Promise<OrderServiceResult<MasterOrder[]>> {
+  const result = await databaseGet<MasterOrder[]>(
+    `/rest/v1/master_orders?select=*&customer_id=eq.${encodeURIComponent(customerId)}&order=created_at.desc`,
+    env,
+    accessToken,
+  );
   return {
-    success: true,
+    success: !result.error,
     data: result.data ?? [],
-    error: null,
+    error: result.error,
   };
 }
 
@@ -86,34 +110,16 @@ export async function getOrder(
   orderId: string,
   env: OrderServiceEnv,
   accessToken: string,
-): Promise<
-  OrderServiceResult<MasterOrder | null>
-> {
-  const result =
-    await databaseGet<MasterOrder[]>(
-      `/rest/v1/master_orders` +
-        `?select=*` +
-        `&id=eq.${encodeURIComponent(
-          orderId,
-        )}` +
-        `&limit=1`,
-      env,
-      accessToken,
-    );
-
-  if (result.error) {
-    return {
-      success: false,
-      data: null,
-      error: result.error,
-    };
-  }
-
+): Promise<OrderServiceResult<MasterOrder | null>> {
+  const result = await databaseGet<MasterOrder[]>(
+    `/rest/v1/master_orders?select=*&id=eq.${encodeURIComponent(orderId)}&limit=1`,
+    env,
+    accessToken,
+  );
   return {
-    success: true,
-    data:
-      result.data?.[0] ?? null,
-    error: null,
+    success: !result.error,
+    data: result.data?.[0] ?? null,
+    error: result.error,
   };
 }
 
@@ -121,33 +127,16 @@ export async function getOrderSubOrders(
   orderId: string,
   env: OrderServiceEnv,
   accessToken: string,
-): Promise<
-  OrderServiceResult<SubOrder[]>
-> {
-  const result =
-    await databaseGet<SubOrder[]>(
-      `/rest/v1/sub_orders` +
-        `?select=*` +
-        `&master_order_id=eq.${encodeURIComponent(
-          orderId,
-        )}` +
-        `&order=created_at.asc`,
-      env,
-      accessToken,
-    );
-
-  if (result.error) {
-    return {
-      success: false,
-      data: null,
-      error: result.error,
-    };
-  }
-
+): Promise<OrderServiceResult<SubOrder[]>> {
+  const result = await databaseGet<SubOrder[]>(
+    `/rest/v1/sub_orders?select=*&master_order_id=eq.${encodeURIComponent(orderId)}&order=created_at.asc`,
+    env,
+    accessToken,
+  );
   return {
-    success: true,
+    success: !result.error,
     data: result.data ?? [],
-    error: null,
+    error: result.error,
   };
 }
 
@@ -155,54 +144,15 @@ export async function getOrderStatusHistory(
   orderId: string,
   env: OrderServiceEnv,
   accessToken: string,
-): Promise<
-  OrderServiceResult<
-    Array<{
-      id: string;
-      master_order_id: string;
-      old_status?: string | null;
-      new_status?: string | null;
-      changed_by?: string | null;
-      reason?: string | null;
-      metadata?: Record<string, unknown>;
-      created_at?: string;
-    }>
-  >
-> {
-  const result =
-    await databaseGet<
-      Array<{
-        id: string;
-        master_order_id: string;
-        old_status?: string | null;
-        new_status?: string | null;
-        changed_by?: string | null;
-        reason?: string | null;
-        metadata?: Record<string, unknown>;
-        created_at?: string;
-      }>
-    >(
-      `/rest/v1/order_status_history` +
-        `?select=*` +
-        `&master_order_id=eq.${encodeURIComponent(
-          orderId,
-        )}` +
-        `&order=created_at.asc`,
-      env,
-      accessToken,
-    );
-
-  if (result.error) {
-    return {
-      success: false,
-      data: null,
-      error: result.error,
-    };
-  }
-
+): Promise<OrderServiceResult<Array<Record<string, unknown>>>> {
+  const result = await databaseGet<Array<Record<string, unknown>>>(
+    `/rest/v1/order_status_history?select=*&master_order_id=eq.${encodeURIComponent(orderId)}&order=created_at.asc`,
+    env,
+    accessToken,
+  );
   return {
-    success: true,
+    success: !result.error,
     data: result.data ?? [],
-    error: null,
+    error: result.error,
   };
 }
