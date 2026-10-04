@@ -8,6 +8,7 @@
 import { routeApi } from "./api-router";
 import { routeCatalog } from "./catalog-router";
 import { routeCoreBusiness } from "./core-business-router";
+import { routeMerchantOperations } from "./merchant-operations-router";
 import { routeOrders } from "./order-router";
 import { routeRider } from "./rider-router";
 import { API_PREFIX } from "./lib/constants";
@@ -48,6 +49,7 @@ async function handle(request: Request, env: Env, requestId: string): Promise<Re
   if (path.startsWith(`${API_PREFIX}/`)) {
     const catalog = await routeCatalog(request, env, requestId); if (catalog) return catalog;
     const order = await routeOrders(request, env, requestId); if (order) return order;
+    const merchantOperations = await routeMerchantOperations(request, env, requestId); if (merchantOperations) return merchantOperations;
     const core = await routeCoreBusiness(request, env, requestId); if (core) return core;
     const rider = await routeRider(request, env, requestId); if (rider) return rider;
     return routeApi(request, env, requestId);
