@@ -1,13 +1,21 @@
 {
-"expo": {
-"name": "WASSLHA Rider",
-"slug": "wasslha-rider",
-"version": "0.1.0",
-"orientation": "portrait",
-"userInterfaceStyle": "automatic",
-"scheme": "wasslha-rider",
-"android": {
-"package": "ma.wasslha.rider"
-}
-}
+  "expo": {
+    "name": "WASSLHA Rider",
+    "slug": "wasslha-rider",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "scheme": "wasslha-rider",
+    "plugins": [
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "WASSLHA يحتاج موقعك أثناء الخدمة لتحديث التوصيل وتتبع المسار."
+        }
+      ]
+    ],
+    "android": {
+      "package": "ma.wasslha.rider"
+    }
+  }
 }
