@@ -5,7 +5,7 @@ import { getProduct,getPublicProduct } from "./services/product-service";
 import { getMerchant,getMerchantByOwner,getPublicMerchant } from "./services/merchant-service";
 import { getStore,getPublicStore } from "./services/store-service";
 import { getCustomerOrders,getOrder,getOrderSubOrders,getOrderStatusHistory } from "./services/order-service";
-import { getDeliveryByOrder,getRiderDeliveries,getDeliveryAssignments } from "./services/delivery-service";
+import { getDeliveryByOrder,getRiderDeliveries,getRiderAssignments,getDeliveryAssignments } from "./services/delivery-service";
 import { getRider,getRiderVehicles } from "./services/rider-service";
 import { getPaymentByOrder,getCustomerPayments,getPaymentTransactions } from "./services/payment-service";
 import { getUserWallet,getWalletTransactions } from "./services/wallet-service";
@@ -72,6 +72,7 @@ export async function routeApi(request:Request,env:unknown,requestId:string):Pro
   if(p[0]==="orders"&&m==="GET"){const denied=guard(context,PERMISSIONS.CUSTOMER_ORDERS_READ,requestId);if(denied)return denied;return ok(await getCustomerOrders(uid,env as any,token),requestId)}
   if(p[0]==="deliveries"&&m==="GET"&&id&&p[2]==="assignments"){const denied=guard(context,PERMISSIONS.RIDER_DELIVERIES_READ,requestId);if(denied)return denied;return ok(await getDeliveryAssignments(id,env as any,token),requestId)}
   if(p[0]==="rider"&&id==="me"&&p[2]==="deliveries"&&m==="GET"){const denied=guard(context,PERMISSIONS.RIDER_DELIVERIES_READ,requestId);if(denied)return denied;return ok(await getRiderDeliveries(uid,env as any,token),requestId)}
+  if(p[0]==="rider"&&id==="me"&&p[2]==="assignments"&&m==="GET"){const denied=guard(context,PERMISSIONS.RIDER_DELIVERIES_READ,requestId);if(denied)return denied;return ok(await getRiderAssignments(uid,env as any,token),requestId)}
   if(p[0]==="rider"&&id==="me"&&p[2]==="vehicles"&&m==="GET"){const denied=guard(context,PERMISSIONS.RIDER_PROFILE_READ,requestId);if(denied)return denied;return ok(await getRiderVehicles(uid,env as any,token),requestId)}
   if(p[0]==="rider"&&id==="me"&&p[2]==="waitlist"&&m==="GET"){const denied=guard(context,PERMISSIONS.RIDER_SLOTS_READ,requestId);if(denied)return denied;return ok(await getRiderWaitlist(uid,env as any,token),requestId)}
   if(p[0]==="rider"&&id==="me"&&p[2]==="attendance"&&m==="GET"){const denied=guard(context,PERMISSIONS.RIDER_SLOTS_READ,requestId);if(denied)return denied;return ok(await getRiderAttendance(uid,env as any,token),requestId)}
