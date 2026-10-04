@@ -2,7 +2,7 @@ import { createRequestContext, isAuthenticated } from "./lib/request-context";
 import { authorize } from "./lib/authorization";
 import { PERMISSIONS } from "./lib/permissions";
 import { errorResponse, successResponse } from "./lib/response";
-import { createOrder, getOrder } from "./services/order-service";
+import { createOrder, getOrder, getSubOrderOwnership } from "./services/order-service";
 import { transitionMasterOrder, transitionSubOrder } from "./services/order-transition-service";
 
 function tokenOf(request: Request): string {
@@ -163,6 +163,10 @@ export async function routeOrders(request: Request, env: unknown, requestId: str
     if (!isUuid(subOrderId)) return fail("INVALID_SUB_ORDER_ID", "Invalid sub-order id", 400, requestId);
     const denied = guard(context, PERMISSIONS.MERCHANT_ORDERS_UPDATE, requestId);
     if (denied) return denied;
+    const ownership = await getSubOrderOwnership(subOrderId, env as any, token);
+    if (!ownership.data) return ownership.error ? fail("ORDER_OPERATION_FAILED", ownership.error, 502, requestId) : fail("SUB_ORDER_NOT_FOUND", "Sub-order not found", 404, requestId);
+    const isAdmin = context.roles.some((role) => role.name === "admin");
+    if (!isAdmin && ownership.data.merchant_user_id !== uid) return fail("FORBIDDEN", "Merchant does not own this sub-order", 403, requestId);
     const body = await bodyOf(request);
     if (!body || !nonEmpty(body.status)) return jsonError(requestId, "status is required");
     const result = await transitionSubOrder(subOrderId, body.status.trim(), uid,
