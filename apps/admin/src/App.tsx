@@ -27,12 +27,6 @@ const navItems: NavItem[] = [
   { key: "settings", label: "الإعدادات", icon: "⚙" },
 ];
 
-const kpis = [
-  { label: "الطلبات اليوم", value: "—", detail: "بانتظار ربط البيانات الحية" },
-  { label: "GMV", value: "— MAD", detail: "من قاعدة البيانات" },
-  { label: "عمولة WASSLHA", value: "— MAD", detail: "من الـ Ledger" },
-  { label: "التوصيلات النشطة", value: "—", detail: "GPS / Dispatch" },
-];
 
 function LoginScreen({
   onAuthenticated,
