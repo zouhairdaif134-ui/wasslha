@@ -83,7 +83,7 @@ export async function routeOrders(request: Request, env: unknown, requestId: str
   const method = request.method.toUpperCase();
 
   if (method === "POST" && path.length === 1) {
-    const denied = guard(context, PERMISSIONS.CUSTOMER_ORDERS_CREATE, requestId);
+    const denied = guard(context, PERMISSIONS.CUSTOMER_ORDERS_CANCEL, requestId);
     if (denied) return denied;
 
     const key = request.headers.get("Idempotency-Key")?.trim() ?? "";
@@ -148,7 +148,7 @@ export async function routeOrders(request: Request, env: unknown, requestId: str
       const denied = guard(context, PERMISSIONS.CUSTOMER_ORDERS_CREATE, requestId);
       if (denied) return denied;
     } else {
-      const denied = guard(context, PERMISSIONS.ADMIN_ORDERS_READ, requestId);
+      const denied = guard(context, PERMISSIONS.ADMIN_ORDERS_UPDATE, requestId);
       if (denied) return denied;
     }
 
