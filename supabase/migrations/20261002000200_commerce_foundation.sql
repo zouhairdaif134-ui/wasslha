@@ -616,7 +616,7 @@ with check (
         select 1
         from public.stores s
         join public.merchants m
-            on m.id = stores.store_id
+            on m.id = s.merchant_id
         where s.id = store_id
           and m.user_id = auth.uid()
     )
