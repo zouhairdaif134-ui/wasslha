@@ -8,3 +8,9 @@ export type Settlement={id:string;period_start:string;period_end:string;gross_am
 export type Dashboard={stores:Store[];products:Product[];orders:SubOrder[];settlements:Settlement[]};
 export const getMerchant=(t:string)=>get<Merchant>(t,"merchant/me");
 export const getDashboard=(t:string)=>get<Dashboard>(t,"merchant/me/dashboard");
+
+export async function updateSubOrderStatus(token:string, subOrderId:string, status:string, reason?:string){
+ const r=await fetch(base+"/api/v1/orders/"+subOrderId+"/sub-status",{method:"POST",headers:{Authorization:"Bearer "+token,Accept:"application/json","Content-Type":"application/json"},body:JSON.stringify({status,reason})});
+ const p=await r.json() as {success?:boolean;data?:unknown;error?:{message?:string}};
+ if(!r.ok||!p.success)throw new Error(p.error?.message??"Unable to update order."); return p.data;
+}
