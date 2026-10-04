@@ -12,7 +12,7 @@ async function patch<T>(token:string,path:string,body:unknown):Promise<T>{const 
 export const getMerchant=(t:string)=>get<Merchant>(t,"merchant/me");
 export const getDashboard=(t:string)=>get<Dashboard>(t,"merchant/me/dashboard");
 
-export async function createStore(token:string,input:Omit<Store,"id">){return post<Store>(token,"stores/me",input);}
+export async function createStore(token:string,input:Pick<Store,"name"|"address_text"> & Partial<Omit<Store,"id"|"name"|"address_text">>){return post<Store>(token,"stores/me",input);}
 export async function updateStore(token:string,id:string,input:Partial<Store>){return patch<Store>(token,"stores/"+id,input);}
 export async function createProduct(token:string,storeId:string,input:Record<string,unknown>){return post<Product>(token,"products/me?store_id="+encodeURIComponent(storeId),input);}
 export async function updateProduct(token:string,id:string,storeId:string,input:Record<string,unknown>){return patch<Product>(token,"products/"+id+"?store_id="+encodeURIComponent(storeId),input);}
