@@ -43,6 +43,7 @@ export const PERMISSIONS = {
   RIDER_DELIVERIES_READ: "rider.deliveries.read",
   RIDER_DELIVERIES_UPDATE: "rider.deliveries.update",
   RIDER_LOCATION_UPDATE: "rider.location.update",
+  RIDER_PERFORMANCE_READ: "rider.performance.read",
 
   CUSTOMER_APP_ACCESS: "customer.app.access",
   CUSTOMER_PROFILE_READ: "customer.profile.read",
@@ -74,13 +75,8 @@ export const PERMISSIONS = {
   NOTIFICATIONS_MANAGE: "notifications.manage",
 } as const;
 
-export type Permission =
-  (typeof PERMISSIONS)[keyof typeof PERMISSIONS];
+export type Permission = (typeof PERMISSIONS)[keyof typeof PERMISSIONS];
 
-export function isPermission(
-  value: string,
-): value is Permission {
-  return Object.values(PERMISSIONS).includes(
-    value as Permission,
-  );
+export function isPermission(value: string): value is Permission {
+  return Object.values(PERMISSIONS).includes(value as Permission);
 }
