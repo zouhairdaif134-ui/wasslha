@@ -57,6 +57,8 @@ export const PERMISSIONS = {
   GET_REQUEST_CREATE: "get_request.create",
   GET_REQUEST_READ: "get_request.read",
   GET_REQUEST_MANAGE: "get_request.manage",
+  GET_REQUEST_PURCHASE_MANAGE: "get_request.purchase.manage",
+  GET_REQUEST_APPROVAL: "get_request.approval",
 
   PAYMENTS_READ: "payments.read",
   PAYMENTS_CREATE: "payments.create",
