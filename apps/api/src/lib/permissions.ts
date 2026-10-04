@@ -39,6 +39,7 @@ export const PERMISSIONS = {
   RIDER_PROFILE_READ: "rider.profile.read",
   RIDER_PROFILE_UPDATE: "rider.profile.update",
   RIDER_SLOTS_READ: "rider.slots.read",
+  RIDER_SLOTS_BOOK: "rider.slots.book",
   RIDER_SLOTS_MANAGE: "rider.slots.manage",
   RIDER_DELIVERIES_READ: "rider.deliveries.read",
   RIDER_DELIVERIES_UPDATE: "rider.deliveries.update",
