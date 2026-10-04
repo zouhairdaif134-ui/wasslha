@@ -4,45 +4,31 @@ import { PERMISSIONS } from "./lib/permissions";
 import { errorResponse, successResponse } from "./lib/response";
 import { recordRiderLocation } from "./services/rider-location-service";
 import { getRiderEarnings } from "./services/finance-service";
-
-function tokenOf(request: Request) { const value = request.headers.get("Authorization") ?? ""; return value.startsWith("Bearer ") ? value.slice(7) : ""; }
-function fail(code: string, message: string, status: number, requestId: string) { return errorResponse({ code, message, status }, requestId); }
-async function bodyOf(request: Request): Promise<Record<string, unknown>> { try { const value = await request.json(); return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {}; } catch { return {}; } }
-function numberField(body: Record<string, unknown>, key: string, min: number, max: number) { const value = body[key]; return typeof value === "number" && Number.isFinite(value) && value >= min && value <= max ? value : null; }
-
-export async function routeRider(request: Request, env: unknown, requestId: string): Promise<Response | null> {
-  const url = new URL(request.url), path = url.pathname.replace(/^\/api\/v1\/?/, "").split("/").filter(Boolean), method = request.method.toUpperCase();
-  if (!(path[0] === "rider" && path[1] === "me")) return null;
-  const context = await createRequestContext(request, env as Parameters<typeof createRequestContext>[1]);
-  if (!isAuthenticated(context)) return fail("UNAUTHORIZED", context.error ?? "Authentication required", 401, requestId);
-  const token = tokenOf(request);
-
-  if (method === "GET" && path[2] === "earnings") {
-    const decision = authorize(context, PERMISSIONS.WALLET_READ);
-    if (!decision.allowed) return fail("FORBIDDEN", decision.reason ?? "Permission denied", 403, requestId);
-    const result = await getRiderEarnings(context.user!.id, env as any, token);
-    if (!result.success) return fail("RIDER_EARNINGS_ERROR", result.error ?? "Unable to load earnings", 502, requestId);
-    const rows = result.data ?? [];
-    let total = 0n, pending = 0n, paid = 0n;
-    for (const row of rows) {
-      const amount = BigInt(row.total_minor || "0"); total += amount;
-      if (["pending", "accrued", "processing"].includes(row.status)) pending += amount;
-      if (["paid", "settled"].includes(row.status)) paid += amount;
-    }
-    return successResponse({ total_minor: total.toString(), pending_minor: pending.toString(), paid_minor: paid.toString(), currency: "MAD", entries: rows }, { requestId });
-  }
-
-  if (!(method === "POST" && path[2] === "location")) return null;
-  const decision = authorize(context, PERMISSIONS.RIDER_DELIVERIES_UPDATE);
-  if (!decision.allowed) return fail("FORBIDDEN", decision.reason ?? "Permission denied", 403, requestId);
-  const body = await bodyOf(request);
-  const latitude = numberField(body, "latitude", -90, 90), longitude = numberField(body, "longitude", -180, 180);
-  const accuracy = body.accuracy_meters == null ? null : numberField(body, "accuracy_meters", 0, 10000);
-  const speed = body.speed_mps == null ? null : numberField(body, "speed_mps", 0, 100);
-  const heading = body.heading == null ? null : numberField(body, "heading", 0, 360);
-  const deliveryId = typeof body.delivery_id === "string" && body.delivery_id.length <= 64 ? body.delivery_id : null;
-  if (latitude === null || longitude === null || (body.accuracy_meters != null && accuracy === null) || (body.speed_mps != null && speed === null) || (body.heading != null && heading === null)) return fail("VALIDATION_ERROR", "Invalid location payload", 400, requestId);
-  const result = await recordRiderLocation(context.user!.id, env as any, token, { delivery_id: deliveryId, latitude, longitude, accuracy_meters: accuracy, speed_mps: speed, heading });
-  if (!result.success) return fail("RIDER_LOCATION_ERROR", result.error ?? "Unable to record location", 502, requestId);
-  return successResponse(result.data, { requestId });
+import { databaseGet, databaseInsert, type DatabaseEnv } from "./lib/database";
+import { servicePost, type ServiceAuthEnv } from "./lib/service-client";
+import { respondToAssignment } from "./services/dispatch-service";
+function tokenOf(request: Request) { const value=request.headers.get("Authorization")??""; return value.startsWith("Bearer ")?value.slice(7):""; }
+function fail(code:string,message:string,status:number,requestId:string){return errorResponse({code,message,status},requestId);}
+async function bodyOf(request:Request):Promise<Record<string,unknown>>{try{const value=await request.json();return value&&typeof value==="object"&&!Array.isArray(value)?value as Record<string,unknown>:{};}catch{return {};}}
+function numberField(body:Record<string,unknown>,key:string,min:number,max:number){const value=body[key];return typeof value==="number"&&Number.isFinite(value)&&value>=min&&value<=max?value:null;}
+function uuidLike(value:unknown){return typeof value==="string"&&/^[0-9a-f-]{36}$/i.test(value);}
+interface RiderRow{id:string;status:string|null;vehicle_type:string|null;vehicle_plate:string|null;is_online:boolean;}
+interface AssignmentRow{id:string;delivery_id:string;rider_id:string;status:string|null;offered_at:string|null;responded_at?:string|null;}
+interface DeliveryRow{id:string;master_order_id:string;delivery_address_text:string;delivery_latitude:number|null;delivery_longitude:number|null;status:string|null;eta_seconds:number|null;}
+interface SlotRow{id:string;slot_date:string;start_time:string;end_time:string;capacity:number;status:string;}
+export async function routeRider(request:Request,env:unknown,requestId:string):Promise<Response|null>{
+ const url=new URL(request.url),path=url.pathname.replace(/^\/api\/v1\/?/,"").split("/").filter(Boolean),method=request.method.toUpperCase();
+ const isRiderRoute=path[0]==="rider"&&path[1]==="me",isSlotRoute=path[0]==="rider-slots"; if(!isRiderRoute&&!isSlotRoute)return null;
+ const context=await createRequestContext(request,env as Parameters<typeof createRequestContext>[1]); if(!isAuthenticated(context))return fail("UNAUTHORIZED",context.error??"Authentication required",401,requestId);
+ const token=tokenOf(request),dbEnv=env as DatabaseEnv,serviceEnv=env as ServiceAuthEnv,riderId=context.user!.id;
+ if(isSlotRoute){const decision=authorize(context,PERMISSIONS.RIDER_SLOTS_READ);if(method==="GET"&&path.length===1){if(!decision.allowed)return fail("FORBIDDEN",decision.reason??"Permission denied",403,requestId);const result=await databaseGet<SlotRow[]>("/rest/v1/rider_slots?select=id,slot_date,start_time,end_time,capacity,status&status=neq.cancelled&order=slot_date.asc,start_time.asc",dbEnv,token);if(result.error)return fail("RIDER_SLOTS_ERROR",result.error,502,requestId);return successResponse(result.data??[],{requestId});}if(method==="POST"&&path.length===3&&path[2]==="waitlist"){if(!decision.allowed)return fail("FORBIDDEN",decision.reason??"Permission denied",403,requestId);const slotId=path[1];if(!uuidLike(slotId))return fail("VALIDATION_ERROR","Invalid slot id",400,requestId);const result=await databaseInsert("/rest/v1/slot_waitlist",{slot_id:slotId,rider_id:riderId},dbEnv,token);if(result.error)return fail("RIDER_WAITLIST_ERROR",result.error,409,requestId);return successResponse(result.data?.[0]??result.data,{requestId});}return null;}
+ if(method==="GET"&&path.length===2){const decision=authorize(context,PERMISSIONS.RIDER_PROFILE_READ);if(!decision.allowed)return fail("FORBIDDEN",decision.reason??"Permission denied",403,requestId);const result=await databaseGet<RiderRow[]>(`/rest/v1/riders?id=eq.${riderId}&select=id,status,vehicle_type,vehicle_plate,is_online`,dbEnv,token);if(result.error)return fail("RIDER_PROFILE_ERROR",result.error,502,requestId);return successResponse(result.data?.[0]??null,{requestId});}
+ if(method==="GET"&&path[2]==="assignments"){const decision=authorize(context,PERMISSIONS.RIDER_DELIVERIES_READ);if(!decision.allowed)return fail("FORBIDDEN",decision.reason??"Permission denied",403,requestId);const result=await databaseGet<AssignmentRow[]>(`/rest/v1/delivery_assignments?rider_id=eq.${riderId}&select=id,delivery_id,rider_id,status,offered_at,responded_at&order=offered_at.desc`,dbEnv,token);if(result.error)return fail("RIDER_ASSIGNMENTS_ERROR",result.error,502,requestId);return successResponse(result.data??[],{requestId});}
+ if(method==="GET"&&path[2]==="deliveries"){const decision=authorize(context,PERMISSIONS.RIDER_DELIVERIES_READ);if(!decision.allowed)return fail("FORBIDDEN",decision.reason??"Permission denied",403,requestId);const assignments=await databaseGet<AssignmentRow[]>(`/rest/v1/delivery_assignments?rider_id=eq.${riderId}&select=delivery_id&order=offered_at.desc`,dbEnv,token);if(assignments.error)return fail("RIDER_DELIVERIES_ERROR",assignments.error,502,requestId);const ids=[...new Set((assignments.data??[]).map(x=>x.delivery_id).filter(uuidLike))];if(!ids.length)return successResponse([],{requestId});const result=await databaseGet<DeliveryRow[]>(`/rest/v1/deliveries?select=id,master_order_id,delivery_address_text,delivery_latitude,delivery_longitude,status,eta_seconds&id=in.(${ids.join(",")})&order=created_at.desc`,dbEnv,token);if(result.error)return fail("RIDER_DELIVERIES_ERROR",result.error,502,requestId);return successResponse(result.data??[],{requestId});}
+ if(method==="GET"&&path[2]==="earnings"){const decision=authorize(context,PERMISSIONS.WALLET_READ);if(!decision.allowed)return fail("FORBIDDEN",decision.reason??"Permission denied",403,requestId);const result=await getRiderEarnings(riderId,env as any,token);if(!result.success)return fail("RIDER_EARNINGS_ERROR",result.error??"Unable to load earnings",502,requestId);const rows=result.data??[];let total=0n,pending=0n,paid=0n;for(const row of rows){const amount=BigInt(row.total_minor||"0");total+=amount;if(["pending","accrued","processing"].includes(row.status))pending+=amount;if(["paid","settled"].includes(row.status))paid+=amount;}return successResponse({total_minor:total.toString(),pending_minor:pending.toString(),paid_minor:paid.toString(),currency:"MAD",entries:rows},{requestId});}
+ if(method==="POST"&&path[2]==="online"){const decision=authorize(context,PERMISSIONS.RIDER_PROFILE_UPDATE);if(!decision.allowed)return fail("FORBIDDEN",decision.reason??"Permission denied",403,requestId);const body=await bodyOf(request);if(typeof body.is_online!=="boolean")return fail("VALIDATION_ERROR","is_online must be boolean",400,requestId);const result=await servicePost<unknown>("/rest/v1/rpc/rider_set_online",serviceEnv,{p_rider_id:riderId,p_is_online:body.is_online});if(result.error)return fail("RIDER_ONLINE_ERROR",result.error,409,requestId);return successResponse(Array.isArray(result.data)?result.data[0]:result.data,{requestId});}
+ if(method==="POST"&&path[2]==="assignments"&&path.length===5&&path[4]==="respond"){const decision=authorize(context,PERMISSIONS.RIDER_DELIVERIES_UPDATE);if(!decision.allowed)return fail("FORBIDDEN",decision.reason??"Permission denied",403,requestId);const assignmentId=path[3];if(!uuidLike(assignmentId))return fail("VALIDATION_ERROR","Invalid assignment id",400,requestId);const body=await bodyOf(request);if(body.status!=="accepted"&&body.status!=="rejected")return fail("VALIDATION_ERROR","Invalid assignment response",400,requestId);const result=await respondToAssignment(assignmentId,riderId,body.status,serviceEnv);if(!result.success)return fail("ASSIGNMENT_RESPONSE_ERROR",result.error??"Unable to respond",409,requestId);return successResponse(result.data,{requestId});}
+ if(method==="POST"&&path[2]==="deliveries"&&path.length===5&&path[4]==="status"){const decision=authorize(context,PERMISSIONS.RIDER_DELIVERIES_UPDATE);if(!decision.allowed)return fail("FORBIDDEN",decision.reason??"Permission denied",403,requestId);const deliveryId=path[3];if(!uuidLike(deliveryId))return fail("VALIDATION_ERROR","Invalid delivery id",400,requestId);const body=await bodyOf(request),allowed=["at_pickup","picked_up","in_transit","delivered","failed","cancelled"];if(typeof body.status!=="string"||!allowed.includes(body.status))return fail("VALIDATION_ERROR","Invalid delivery status",400,requestId);const reason=typeof body.reason==="string"?body.reason.slice(0,500):null;const result=await servicePost<unknown>("/rest/v1/rpc/rider_transition_delivery_status",serviceEnv,{p_delivery_id:deliveryId,p_rider_id:riderId,p_new_status:body.status,p_reason:reason});if(result.error)return fail("DELIVERY_STATUS_ERROR",result.error,409,requestId);return successResponse(Array.isArray(result.data)?result.data[0]:result.data,{requestId});}
+ if(method==="POST"&&path[2]==="location"){const decision=authorize(context,PERMISSIONS.RIDER_LOCATION_UPDATE);if(!decision.allowed)return fail("FORBIDDEN",decision.reason??"Permission denied",403,requestId);const body=await bodyOf(request),latitude=numberField(body,"latitude",-90,90),longitude=numberField(body,"longitude",-180,180),accuracy=body.accuracy_meters==null?null:numberField(body,"accuracy_meters",0,10000),speed=body.speed_mps==null?null:numberField(body,"speed_mps",0,100),heading=body.heading==null?null:numberField(body,"heading",0,360),deliveryId=typeof body.delivery_id==="string"&&body.delivery_id.length<=64?body.delivery_id:null;if(latitude===null||longitude===null||(body.accuracy_meters!=null&&accuracy===null)||(body.speed_mps!=null&&speed===null)||(body.heading!=null&&heading===null))return fail("VALIDATION_ERROR","Invalid location payload",400,requestId);const result=await recordRiderLocation(riderId,env as any,token,{delivery_id:deliveryId,latitude,longitude,accuracy_meters:accuracy,speed_mps:speed,heading});if(!result.success)return fail("RIDER_LOCATION_ERROR",result.error??"Unable to record location",502,requestId);return successResponse(result.data,{requestId});}
+ return null;
 }
