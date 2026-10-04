@@ -22,6 +22,9 @@ import { PERMISSIONS } from "./lib/permissions";
 import { getAdminDashboardOverview } from "./services/admin-dashboard-service";
 import { getAdminOrders,getAdminMerchants,getAdminRiders,getAdminFinance,getAdminSupport,getAdminUsers,getAdminAudit } from "./services/admin-operational-service";
 import { getMerchantDashboard } from "./services/merchant-dashboard-service";
+import { updateRider, createRiderVehicle } from "./services/rider-service";
+import { joinSlotWaitlist } from "./services/rider-slot-service";
+import { offerDelivery, respondToAssignment } from "./services/dispatch-service";
 import { getAdminGovernanceOverview } from "./services/admin-governance-service";
 
 function tokenOf(request:Request){const value=request.headers.get("Authorization")??"";return value.startsWith("Bearer ")?value.slice(7):""}
