@@ -1,7 +1,9 @@
 import { databaseGet, databaseUpdate, type DatabaseEnv } from "../lib/database";
 export interface MerchantServiceEnv extends DatabaseEnv {}
 export interface Merchant { id:string; user_id:string; business_name:string; legal_name?:string|null; phone?:string|null; email?:string|null; status:string; rejection_reason?:string|null; approved_at?:string|null; approved_by?:string|null; created_at?:string; updated_at?:string }
+export interface PublicMerchant { id:string; business_name:string; status:string }
 export interface MerchantServiceResult<T>{success:boolean;data:T|null;error:string|null}
 export async function getMerchantByOwner(userId:string,env:MerchantServiceEnv,token:string){const r=await databaseGet<Merchant[]>(`/rest/v1/merchants?select=*&user_id=eq.${encodeURIComponent(userId)}&limit=1`,env,token);return {success:!r.error,data:r.data?.[0]??null,error:r.error} as MerchantServiceResult<Merchant|null>}
 export async function getMerchant(id:string,env:MerchantServiceEnv,token:string){const r=await databaseGet<Merchant[]>(`/rest/v1/merchants?select=*&id=eq.${encodeURIComponent(id)}&limit=1`,env,token);return {success:!r.error,data:r.data?.[0]??null,error:r.error} as MerchantServiceResult<Merchant|null>}
+export async function getPublicMerchant(id:string,env:MerchantServiceEnv,token?:string){const r=await databaseGet<PublicMerchant[]>(`/rest/v1/merchants?select=id,business_name,status&id=eq.${encodeURIComponent(id)}&status=eq.approved&limit=1`,env,token);return {success:!r.error,data:r.data?.[0]??null,error:r.error} as MerchantServiceResult<PublicMerchant|null>}
 export async function updateMerchant(id:string,env:MerchantServiceEnv,token:string,updates:Partial<Pick<Merchant,"business_name"|"legal_name"|"phone"|"email">>){const r=await databaseUpdate<Merchant[]>(`/rest/v1/merchants?id=eq.${encodeURIComponent(id)}`,env,updates,token);return {success:!r.error,data:r.data?.[0]??null,error:r.error} as MerchantServiceResult<Merchant|null>}
