@@ -82,10 +82,10 @@ create index if not exists delivery_events_delivery_created_idx
 -- 3. RIDER INTEGRITY
 -- =========================================================
 
-create index if not exists rider_slots_rider_date_idx
+create index if not exists rider_slots_date_time_idx
     on public.rider_slots (
-        rider_id,
-        slot_date
+        slot_date,
+        start_time
     );
 
 create index if not exists slot_waitlist_slot_position_idx
