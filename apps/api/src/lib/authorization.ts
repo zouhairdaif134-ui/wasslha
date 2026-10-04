@@ -19,7 +19,7 @@ const ROLE_PERMISSIONS: Record<string, readonly Permission[]> = {
   admin: [
     "admin.dashboard.view","admin.users.read","admin.users.manage","admin.orders.read","admin.orders.update","admin.merchants.read","admin.merchants.manage","admin.riders.read","admin.riders.manage","admin.finance.read","admin.finance.manage","admin.support.read","admin.support.manage","admin.reports.read","admin.settings.read","admin.settings.manage","admin.audit.read",
     "merchant.dashboard.view","merchant.profile.read","merchant.profile.update","merchant.stores.manage","merchant.products.manage","merchant.orders.read","merchant.orders.update",
-    "rider.app.access","rider.profile.read","rider.profile.update","rider.slots.read","rider.slots.manage","rider.deliveries.read","rider.deliveries.update","rider.location.update","rider.performance.read",
+    "rider.app.access","rider.profile.read","rider.profile.update","rider.slots.read","rider.slots.book","rider.slots.manage","rider.deliveries.read","rider.deliveries.update","rider.location.update","rider.performance.read",
     "customer.app.access","customer.profile.read","customer.profile.update","customer.addresses.manage","customer.orders.read","customer.orders.create","customer.orders.cancel",
     "get_request.create","get_request.read","get_request.manage","payments.read","payments.create","payments.manage","wallet.read","wallet.manage","support.create","support.read","support.manage","reviews.create","reviews.manage","notifications.read","notifications.manage",
   ],
@@ -27,7 +27,7 @@ const ROLE_PERMISSIONS: Record<string, readonly Permission[]> = {
     "merchant.dashboard.view","merchant.profile.read","merchant.profile.update","merchant.stores.manage","merchant.products.manage","merchant.orders.read","merchant.orders.update","support.create","support.read","reviews.manage","notifications.read",
   ],
   rider: [
-    "rider.app.access","rider.profile.read","rider.profile.update","rider.slots.read","rider.slots.manage","rider.deliveries.read","rider.deliveries.update","rider.location.update","rider.performance.read","wallet.read","support.create","support.read","notifications.read",
+    "rider.app.access","rider.profile.read","rider.profile.update","rider.slots.read","rider.slots.book","rider.slots.manage","rider.deliveries.read","rider.deliveries.update","rider.location.update","rider.performance.read","wallet.read","support.create","support.read","notifications.read",
   ],
   customer: [
     "customer.app.access","customer.profile.read","customer.profile.update","customer.addresses.manage","customer.orders.read","customer.orders.create","get_request.create","get_request.read","payments.read","payments.create","wallet.read","support.create","support.read","reviews.create","notifications.read",
