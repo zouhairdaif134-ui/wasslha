@@ -382,8 +382,10 @@ using (
               or exists (
                   select 1
                   from public.sub_orders so
+                  join public.stores s
+                      on s.id = so.store_id
                   join public.merchants m
-                      on m.id = so.merchant_id
+                      on m.id = s.merchant_id
                   where so.master_order_id = c.master_order_id
                     and m.user_id = auth.uid()
               )
