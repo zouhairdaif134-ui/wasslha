@@ -90,13 +90,13 @@ create index if not exists rider_slots_date_time_idx
 
 create index if not exists slot_waitlist_slot_position_idx
     on public.slot_waitlist (
-        rider_slot_id,
+        slot_id,
         position
     );
 
 create index if not exists slot_attendance_slot_rider_idx
     on public.slot_attendance (
-        rider_slot_id,
+        slot_id,
         rider_id
     );
 
