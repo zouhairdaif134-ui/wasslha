@@ -12,3 +12,23 @@ namespace_id = "1001"
   [ratelimits.simple]
   limit = 100
   period = 60
+
+# Development is the default environment.
+# Staging and production are explicitly selected with:
+#   wrangler deploy --env staging
+#   wrangler deploy --env production
+#
+# Secrets are NEVER committed here. Configure them in the
+# Cloudflare environment that owns the deployment.
+
+[env.staging]
+name = "wasslha-api-staging"
+
+[env.staging.vars]
+ENVIRONMENT = "staging"
+
+[env.production]
+name = "wasslha-api-production"
+
+[env.production.vars]
+ENVIRONMENT = "production"
