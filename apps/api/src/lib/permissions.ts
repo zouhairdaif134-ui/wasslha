@@ -13,6 +13,7 @@ export const PERMISSIONS = {
   ADMIN_USERS_READ: "admin.users.read",
   ADMIN_USERS_MANAGE: "admin.users.manage",
   ADMIN_ORDERS_READ: "admin.orders.read",
+  ADMIN_ORDERS_UPDATE: "admin.orders.update",
   ADMIN_MERCHANTS_READ: "admin.merchants.read",
   ADMIN_MERCHANTS_MANAGE: "admin.merchants.manage",
   ADMIN_RIDERS_READ: "admin.riders.read",
@@ -49,6 +50,7 @@ export const PERMISSIONS = {
   CUSTOMER_ADDRESSES_MANAGE: "customer.addresses.manage",
   CUSTOMER_ORDERS_READ: "customer.orders.read",
   CUSTOMER_ORDERS_CREATE: "customer.orders.create",
+  CUSTOMER_ORDERS_CANCEL: "customer.orders.cancel",
 
   GET_REQUEST_CREATE: "get_request.create",
   GET_REQUEST_READ: "get_request.read",
