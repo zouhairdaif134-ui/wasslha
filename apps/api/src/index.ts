@@ -44,16 +44,50 @@ function requestIdOf(request: Request): string {
     : crypto.randomUUID();
 }
 
-function allowedOrigin(requestOrigin: string | null, env: Env): string {
-  const configured = (env.ALLOWED_ORIGINS ?? "").split(",").map((v) => v.trim()).filter(Boolean);
-  if (!requestOrigin) return configured[0] ?? "*";
-  if (configured.length === 0) return "*";
-  return configured.includes(requestOrigin) ? requestOrigin : "null";
+function configuredOrigins(env: Env): string[] {
+  return (env.ALLOWED_ORIGINS ?? "")
+    .split(",")
+    .map((value) => value.trim())
+    .filter(Boolean);
 }
 
-function withCors(response: Response, env: Env, requestOrigin: string | null): Response {
+function allowedOrigin(
+  requestOrigin: string | null,
+  env: Env,
+): string {
+  const configured = configuredOrigins(env);
+
+  // Production must fail closed. A missing allow-list must never
+  // silently turn the production API into a wildcard CORS endpoint.
+  if (env.ENVIRONMENT === "production" && configured.length === 0) {
+    return "null";
+  }
+
+  if (!requestOrigin) {
+    return configured[0] ?? "*";
+  }
+
+  if (configured.length === 0) {
+    return env.ENVIRONMENT === "development"
+      ? requestOrigin
+      : "null";
+  }
+
+  return configured.includes(requestOrigin)
+    ? requestOrigin
+    : "null";
+}
+
+function withCors(
+  response: Response,
+  env: Env,
+  requestOrigin: string | null,
+): Response {
   const headers = new Headers(response.headers);
-  headers.set("Access-Control-Allow-Origin", allowedOrigin(requestOrigin, env));
+  headers.set(
+    "Access-Control-Allow-Origin",
+    allowedOrigin(requestOrigin, env),
+  );
   headers.set("Vary", "Origin");
   headers.set(
     "Access-Control-Allow-Methods",
@@ -77,7 +111,11 @@ function withCors(response: Response, env: Env, requestOrigin: string | null): R
   });
 }
 
-function json(data: unknown, status: number, requestId: string): Response {
+function json(
+  data: unknown,
+  status: number,
+  requestId: string,
+): Response {
   return new Response(JSON.stringify(data), {
     status,
     headers: {
@@ -89,21 +127,36 @@ function json(data: unknown, status: number, requestId: string): Response {
   });
 }
 
-function methodNotAllowed(requestId: string, allowed: string[]): Response {
-  return json(
-    {
+function methodNotAllowed(
+  requestId: string,
+  allowed: string[],
+): Response {
+  return new Response(
+    JSON.stringify({
       success: false,
       error: {
         code: "METHOD_NOT_ALLOWED",
         message: "HTTP method not allowed",
+        allowed_methods: allowed,
+      },
+    }),
+    {
+      status: 405,
+      headers: {
+        "Content-Type": "application/json; charset=utf-8",
+        "Cache-Control": "no-store",
+        "X-Request-ID": requestId,
+        Allow: allowed.join(", "),
+        ...getSecurityHeaders(),
       },
     },
-    405,
-    requestId,
   );
 }
 
-function publicApiRoot(env: Env, requestId: string): Response {
+function publicApiRoot(
+  env: Env,
+  requestId: string,
+): Response {
   return json(
     {
       success: true,
@@ -119,7 +172,10 @@ function publicApiRoot(env: Env, requestId: string): Response {
   );
 }
 
-function health(env: Env, requestId: string): Response {
+function health(
+  env: Env,
+  requestId: string,
+): Response {
   return json(
     {
       success: true,
@@ -137,31 +193,66 @@ function health(env: Env, requestId: string): Response {
   );
 }
 
-function readiness(env: Env, requestId: string): Response {
-  const supabaseConfigured =
-    Boolean(env.SUPABASE_URL?.trim()) &&
+function readiness(
+  env: Env,
+  requestId: string,
+): Response {
+  const supabaseUrlConfigured =
+    Boolean(env.SUPABASE_URL?.trim());
+
+  const supabaseAnonConfigured =
     Boolean(env.SUPABASE_ANON_KEY?.trim());
+
+  const supabaseServiceRoleConfigured =
+    Boolean(env.SUPABASE_SERVICE_ROLE_KEY?.trim());
+
+  const originsConfigured =
+    configuredOrigins(env).length > 0;
+
+  const ready =
+    supabaseUrlConfigured &&
+    supabaseAnonConfigured &&
+    supabaseServiceRoleConfigured &&
+    (env.ENVIRONMENT !== "production" || originsConfigured);
 
   return json(
     {
-      success: supabaseConfigured,
+      success: ready,
       data: {
-        status: supabaseConfigured ? "ready" : "degraded",
+        status: ready ? "ready" : "degraded",
         service: "wasslha-api",
+        environment: env.ENVIRONMENT,
         checks: {
           api: "ok",
-          supabase: supabaseConfigured ? "configured" : "not_configured",
+          supabase_url: supabaseUrlConfigured
+            ? "configured"
+            : "not_configured",
+          supabase_anon_key: supabaseAnonConfigured
+            ? "configured"
+            : "not_configured",
+          supabase_service_role_key:
+            supabaseServiceRoleConfigured
+              ? "configured"
+              : "not_configured",
+          cors_allow_list:
+            originsConfigured
+              ? "configured"
+              : "not_configured",
         },
         timestamp: new Date().toISOString(),
         request_id: requestId,
       },
     },
-    supabaseConfigured ? 200 : 503,
+    ready ? 200 : 503,
     requestId,
   );
 }
 
-async function handle(request: Request, env: Env, requestId: string): Promise<Response> {
+async function handle(
+  request: Request,
+  env: Env,
+  requestId: string,
+): Promise<Response> {
   const url = new URL(request.url);
   const path = url.pathname;
   const method = request.method.toUpperCase();
@@ -184,10 +275,8 @@ async function handle(request: Request, env: Env, requestId: string): Promise<Re
       : methodNotAllowed(requestId, ["GET"]);
   }
 
-  if (path === AUTH_ME_PATH) {
-    if (method !== "GET") {
-      return methodNotAllowed(requestId, ["GET"]);
-    }
+  if (path === AUTH_ME_PATH && method !== "GET") {
+    return methodNotAllowed(requestId, ["GET"]);
   }
 
   if (path.startsWith(`${API_PREFIX}/`)) {
@@ -208,7 +297,10 @@ async function handle(request: Request, env: Env, requestId: string): Promise<Re
 }
 
 export default {
-  async fetch(request: Request, env: Env): Promise<Response> {
+  async fetch(
+    request: Request,
+    env: Env,
+  ): Promise<Response> {
     const requestId = requestIdOf(request);
 
     try {
@@ -226,13 +318,25 @@ export default {
         );
       }
 
-      const response = await handle(request, env, requestId);
-      return withCors(response, env, request.headers.get("Origin"));
-    } catch (error) {
-      console.error("Unhandled WASSLHA API error", {
+      const response = await handle(
+        request,
+        env,
         requestId,
-        error,
-      });
+      );
+
+      return withCors(
+        response,
+        env,
+        request.headers.get("Origin"),
+      );
+    } catch (error) {
+      console.error(
+        "Unhandled WASSLHA API error",
+        {
+          requestId,
+          error,
+        },
+      );
 
       return withCors(
         json(
