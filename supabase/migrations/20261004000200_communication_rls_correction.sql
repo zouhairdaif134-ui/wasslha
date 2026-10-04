@@ -41,7 +41,7 @@ using (
         join public.riders r
             on r.id = da.rider_id
         where d.master_order_id = conversations.master_order_id
-          and r.user_id = auth.uid()
+          and r.id = auth.uid()
     )
 );
 
@@ -86,7 +86,7 @@ using (
                   join public.riders r
                       on r.id = da.rider_id
                   where d.master_order_id = c.master_order_id
-                    and r.user_id = auth.uid()
+                    and r.id = auth.uid()
               )
           )
     )
