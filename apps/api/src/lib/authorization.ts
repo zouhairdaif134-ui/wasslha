@@ -36,6 +36,7 @@ const ROLE_PERMISSIONS: Record<
     "admin.users.read",
     "admin.users.manage",
     "admin.orders.read",
+    "admin.orders.update",
     "admin.merchants.read",
     "admin.merchants.manage",
     "admin.riders.read",
@@ -72,6 +73,7 @@ const ROLE_PERMISSIONS: Record<
     "customer.addresses.manage",
     "customer.orders.read",
     "customer.orders.create",
+    "customer.orders.cancel",
 
     "get_request.create",
     "get_request.read",
