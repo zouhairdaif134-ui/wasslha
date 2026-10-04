@@ -2,7 +2,7 @@
  * WASSLHA
  * Backend RBAC Foundation
  *
- * Resolves user roles from the database.
+ * Resolves user roles from the database and rejects inactive accounts.
  * Authorization decisions remain server-side.
  * Berrechid MVP.
  */
@@ -37,20 +37,22 @@ async function queryUserRoles(
   }
 
   try {
-    const url =
-      `${env.SUPABASE_URL.replace(/\/$/, "")}` +
-      `/rest/v1/user_roles` +
-      `?select=role_id,roles(id,name)` +
-      `&user_id=eq.${encodeURIComponent(userId)}`;
+    const baseUrl = env.SUPABASE_URL.replace(/\/$/, "");
+    const encodedUserId = encodeURIComponent(userId);
 
-    const response = await fetch(url, {
-      method: "GET",
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        apikey: env.SUPABASE_ANON_KEY,
-        Accept: "application/json",
+    const response = await fetch(
+      `${baseUrl}/rest/v1/user_roles` +
+        `?select=role_id,roles(id,name),users!inner(is_active)` +
+        `&user_id=eq.${encodedUserId}`,
+      {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          apikey: env.SUPABASE_ANON_KEY,
+          Accept: "application/json",
+        },
       },
-    });
+    );
 
     if (!response.ok) {
       return {
@@ -66,15 +68,27 @@ async function queryUserRoles(
         id?: string;
         name?: string;
       } | null;
+      users?: {
+        is_active?: boolean;
+      } | null;
     }>;
+
+    const inactive = rows.some(
+      (row) => row.users?.is_active === false,
+    );
+
+    if (inactive) {
+      return {
+        resolved: false,
+        roles: [],
+        error: "Account is inactive",
+      };
+    }
 
     const roles: UserRole[] = [];
 
     for (const row of rows) {
-      if (
-        row.roles?.id &&
-        row.roles.name
-      ) {
+      if (row.roles?.id && row.roles.name) {
         roles.push({
           id: row.roles.id,
           name: row.roles.name,
@@ -103,36 +117,26 @@ export async function resolveUserRoles(
   accessToken: string,
   env: RbacEnv,
 ): Promise<RbacResult> {
-  return queryUserRoles(
-    userId,
-    accessToken,
-    env,
-  );
+  return queryUserRoles(userId, accessToken, env);
 }
 
 export function hasRole(
   roles: UserRole[],
   roleName: string,
 ): boolean {
-  return roles.some(
-    (role) => role.name === roleName,
-  );
+  return roles.some((role) => role.name === roleName);
 }
 
 export function hasAnyRole(
   roles: UserRole[],
   roleNames: string[],
 ): boolean {
-  return roleNames.some((roleName) =>
-    hasRole(roles, roleName),
-  );
+  return roleNames.some((roleName) => hasRole(roles, roleName));
 }
 
 export function hasAllRoles(
   roles: UserRole[],
   roleNames: string[],
 ): boolean {
-  return roleNames.every((roleName) =>
-    hasRole(roles, roleName),
-  );
+  return roleNames.every((roleName) => hasRole(roles, roleName));
 }
