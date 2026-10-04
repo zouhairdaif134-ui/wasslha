@@ -36,9 +36,9 @@ create index if not exists cancellations_order_idx
         created_at desc
     );
 
-create index if not exists substitutions_order_idx
+create index if not exists substitutions_order_item_idx
     on public.substitutions (
-        master_order_id,
+        order_item_id,
         created_at desc
     );
 
