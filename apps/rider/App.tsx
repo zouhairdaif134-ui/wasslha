@@ -20,7 +20,7 @@ type Wallet={id:string;balance_minor:number|string;currency:string;status:string
 type Performance={period_start:string;period_end:string;completed_deliveries:number;cancelled_deliveries:number;late_deliveries:number;acceptance_rate:number|null;completion_rate:number|null;average_delivery_minutes:number|null;customer_rating:number|null};
 type Tab="home"|"orders"|"slots"|"earnings"|"profile";
 type DeliveryStatus="at_pickup"|"picked_up"|"in_transit"|"delivered"|"failed"|"cancelled";
-type RouteInfo={phase:"pickup"|"delivery";distance_meters:number;duration_seconds:number;polyline:string|null};
+type RouteInfo={phase:"pickup"|"delivery";distance_meters:number;duration_seconds:number;polyline:string|null;origin?:{latitude:number;longitude:number;recorded_at?:string};destination?:{latitude:number;longitude:number};};
 
 async function api<T>(session:Session,path:string,options:RequestInit={}):Promise<T>{const r=await fetch(apiBase+"/api/v1/"+path,{...options,headers:{Accept:"application/json",Authorization:"Bearer "+session.access_token,...(options.body?{"Content-Type":"application/json"}:{}),...(options.headers??{})}});const p=await r.json() as {success?:boolean;data?:T;error?:{message?:string}};if(!r.ok||!p.success)throw new Error(p.error?.message??"API request failed");return p.data as T}
 const money=(v:number|string|undefined)=>(Number(v??0)/100).toFixed(2)+" DH";
