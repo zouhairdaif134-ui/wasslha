@@ -2,8 +2,9 @@ import { createRequestContext, isAuthenticated } from "./lib/request-context";
 import { authorize } from "./lib/authorization";
 import { PERMISSIONS } from "./lib/permissions";
 import { errorResponse, successResponse } from "./lib/response";
-import { createOrder, getOrder, getSubOrderDeliveryId, getSubOrderOwnership } from "./services/order-service";
+import { createOrder, getOrder, getSubOrderDeliveryId, getSubOrderMasterOrderId, getSubOrderOwnership } from "./services/order-service";
 import { autoOfferDelivery } from "./services/dispatch-service";
+import { servicePost, type ServiceAuthEnv } from "./lib/service-client";
 import { transitionMasterOrder, transitionSubOrder } from "./services/order-transition-service";
 import { quoteOrder } from "./services/order-pricing-service";
 
@@ -209,14 +210,24 @@ export async function routeOrders(request: Request, env: unknown, requestId: str
       return fail("ORDER_OPERATION_FAILED", e || "Sub-order transition failed", 502, requestId);
     }
     let dispatch: {status:string;error?:string} = {status:"not_started"};
-    if (body.status.trim() === "confirmed" && result.success) {
-      const delivery = await getSubOrderDeliveryId(subOrderId, env as any, token);
-      if (delivery.data) {
-        const offered = await autoOfferDelivery(delivery.data, env as any);
-        dispatch = offered.success ? {status:"offered"} : {status:offered.error?.includes("NO_ELIGIBLE_RIDER") ? "waiting_for_rider" : "pending"};
-      } else {
-        dispatch = {status:"pending"};
+    const masterOrderId = await getSubOrderMasterOrderId(subOrderId, env as any, token);
+    if (masterOrderId.data) {
+      const sync = await servicePost<unknown>("/rest/v1/rpc/sync_master_order_status_from_suborders", env as ServiceAuthEnv, {
+        p_master_order_id: masterOrderId.data,
+        p_changed_by: uid
+      });
+      if (sync.error) dispatch = {status:"pending"};
+      else {
+        const delivery = await getSubOrderDeliveryId(subOrderId, env as any, token);
+        if (delivery.data && body.status.trim() === "ready_for_pickup") {
+          const offered = await autoOfferDelivery(delivery.data, env as any);
+          dispatch = offered.success ? {status:"offered"} : {status:offered.error?.includes("NO_ELIGIBLE_RIDER") ? "waiting_for_rider" : "pending"};
+        } else {
+          dispatch = {status:"not_ready"};
+        }
       }
+    } else {
+      dispatch = {status:"pending"};
     }
     return ok({...((result.data as Record<string,unknown>) ?? {}), dispatch}, requestId);
   }
