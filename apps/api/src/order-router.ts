@@ -4,6 +4,7 @@ import { PERMISSIONS } from "./lib/permissions";
 import { errorResponse, successResponse } from "./lib/response";
 import { createOrder, getOrder, getSubOrderOwnership } from "./services/order-service";
 import { transitionMasterOrder, transitionSubOrder } from "./services/order-transition-service";
+import { quoteOrder } from "./services/order-pricing-service";
 
 function tokenOf(request: Request): string {
   const value = request.headers.get("Authorization") ?? "";
@@ -82,6 +83,26 @@ export async function routeOrders(request: Request, env: unknown, requestId: str
   const uid = context.user!.id;
   const method = request.method.toUpperCase();
 
+  if (method === "POST" && path.length === 2 && path[1] === "quote") {
+    const denied = guard(context, PERMISSIONS.CUSTOMER_ORDERS_CREATE, requestId);
+    if (denied) return denied;
+    const body = await bodyOf(request);
+    if (!body || !isUuid(body.delivery_address_id) || !Array.isArray(body.items) || body.items.length === 0 || body.items.length > 100) {
+      return fail("INVALID_ORDER_REQUEST", "Invalid delivery address or items", 400, requestId);
+    }
+    const items = body.items.map((item) => {
+      if (!item || typeof item !== "object" || Array.isArray(item)) return null;
+      const x = item as Record<string, unknown>;
+      if (!isUuid(x.product_id) || typeof x.quantity !== "number" || !Number.isFinite(x.quantity) || x.quantity <= 0 || x.quantity > 1000) return null;
+      return { product_id: x.product_id, quantity: x.quantity };
+    });
+    if (items.some((item) => item === null)) return fail("INVALID_ORDER_REQUEST", "One or more order items are invalid", 400, requestId);
+    const tip = typeof body.tip_minor === "number" && Number.isInteger(body.tip_minor) ? body.tip_minor : 0;
+    const result = await quoteOrder(uid, body.delivery_address_id, items as {product_id:string;quantity:number}[], env as any, token, tip);
+    if (!result.success || !result.data) return fail("ORDER_QUOTE_FAILED", result.error ?? "Unable to quote order", 409, requestId);
+    return ok(result.data, requestId);
+  }
+
   if (method === "POST" && path.length === 1) {
     const denied = guard(context, PERMISSIONS.CUSTOMER_ORDERS_CREATE, requestId);
     if (denied) return denied;
@@ -114,11 +135,19 @@ export async function routeOrders(request: Request, env: unknown, requestId: str
     });
     if (normalizedItems.some((item) => item === null)) return fail("INVALID_ORDER_REQUEST", "One or more order items are invalid", 400, requestId);
 
+    const tipMinor = typeof body.tip_minor === "number" && Number.isInteger(body.tip_minor) && body.tip_minor >= 0 ? body.tip_minor : 0;
+    if (tipMinor > 100000) return fail("INVALID_ORDER_AMOUNT", "tip_minor is too large", 400, requestId);
+    const pricing = await quoteOrder(uid, addressId, normalizedItems as NonNullable<(typeof normalizedItems)[number]>[], env as any, token, tipMinor);
+    if (!pricing.success || !pricing.data) return fail("ORDER_QUOTE_FAILED", pricing.error ?? "Unable to calculate order fees", 409, requestId);
     const result = await createOrder(uid, {
       delivery_address_id: addressId,
       payment_method: paymentMethod,
       customer_note: typeof body.customer_note === "string" ? body.customer_note.trim().slice(0, 1000) : undefined,
       items: normalizedItems as NonNullable<(typeof normalizedItems)[number]>[],
+      delivery_fee_minor: pricing.data.delivery_fee_minor,
+      service_fee_minor: pricing.data.service_fee_minor,
+      discount_minor: pricing.data.discount_minor,
+      tip_minor: pricing.data.tip_minor,
     }, key, env as any);
 
     if (!result.success || !result.data) return mapOrderError(result.error, requestId);
