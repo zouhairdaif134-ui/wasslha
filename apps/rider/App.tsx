@@ -1,6 +1,7 @@
 import "react-native-url-polyfill/auto";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Location from "expo-location";
+import * as TaskManager from "expo-task-manager";
 import { createClient, type Session } from "@supabase/supabase-js";
 import { useEffect, useMemo, useState } from "react";
 import { ActivityIndicator, Alert, Linking, Pressable, SafeAreaView, ScrollView, StyleSheet, Switch, Text, TextInput, View } from "react-native";
@@ -10,6 +11,17 @@ const supabaseUrl=process.env.EXPO_PUBLIC_SUPABASE_URL??"";
 const supabaseAnonKey=process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY??"";
 const apiBase=(process.env.EXPO_PUBLIC_API_BASE_URL??"").replace(/\/$/,"");
 const supabase=createClient(supabaseUrl,supabaseAnonKey,{auth:{storage:AsyncStorage,autoRefreshToken:true,persistSession:true,detectSessionInUrl:false}});
+const LOCATION_TASK_NAME="wasslha-rider-live-location";
+const ACTIVE_DELIVERY_KEY="wasslha:rider:active-delivery";
+TaskManager.defineTask<{locations:Location.LocationObject[]}>(LOCATION_TASK_NAME,async({data,error})=>{
+  if(error||!data?.locations?.length)return;
+  const session=(await supabase.auth.getSession()).data.session;
+  if(!session||!apiBase)return;
+  const activeDelivery=await AsyncStorage.getItem(ACTIVE_DELIVERY_KEY);
+  const latest=data.locations[data.locations.length-1];
+  const c=latest.coords;
+  try{await fetch(apiBase+"/api/v1/rider/me/location",{method:"POST",headers:{Accept:"application/json","Authorization":"Bearer "+session.access_token,"Content-Type":"application/json"},body:JSON.stringify({delivery_id:activeDelivery||null,latitude:c.latitude,longitude:c.longitude,accuracy_meters:c.accuracy,speed_mps:c.speed,heading:c.heading})});}catch{}
+});
 
 type Rider={id:string;status?:string|null;vehicle_type?:string|null;vehicle_plate?:string|null;is_online?:boolean};
 type Assignment={id:string;delivery_id:string;rider_id:string;status?:string|null;offered_at?:string|null};
@@ -40,7 +52,7 @@ function RiderHome({session}:{session:Session}){const[rider,setRider]=useState<R
 async function load(silent=false){silent?setRefreshing(true):setLoading(true);try{const[a,b,c,d,e,f,g]=await Promise.all([api<Rider>(session,"rider/me"),api<Assignment[]>(session,"rider/me/assignments"),api<Delivery[]>(session,"rider/me/deliveries"),api<Slot[]>(session,"rider-slots"),api<Earnings>(session,"rider/me/earnings"),api<Wallet>(session,"rider/me/wallet"),api<Performance[]>(session,"rider/me/performance")]);setRider(a);setAssignments(b);setDeliveries(c);setSlots(d);setEarnings(e);setWallet(f);setPerformance(g)}catch(e){Alert.alert("WASSLHA",e instanceof Error?e.message:"تعذر تحميل البيانات")}finally{setLoading(false);setRefreshing(false)}}
 useEffect(()=>{void load()},[]);useEffect(()=>{const t=setInterval(()=>{if(rider?.is_online||activeDelivery)void load(true)},8000);return()=>clearInterval(t)},[rider?.is_online,activeDelivery?.id]);
 useEffect(()=>{let dead=false;async function refreshRoute(){if(!activeDelivery){setRouteInfo(null);return}try{const r=await api<RouteInfo>(session,"rider/me/deliveries/"+activeDelivery.id+"/route");if(!dead)setRouteInfo(r)}catch{if(!dead)setRouteInfo(null)}}void refreshRoute();const t=setInterval(()=>void refreshRoute(),15000);return()=>{dead=true;clearInterval(t)}},[activeDelivery?.id,activeDelivery?.status,session]);
-useEffect(()=>{let dead=false;let watcher:Location.LocationSubscription|undefined;(async()=>{if(!rider?.is_online){setGps("off");return}setGps("starting");const permission=await Location.requestForegroundPermissionsAsync();if(dead||permission.status!=="granted"){setGps("off");return}watcher=await Location.watchPositionAsync({accuracy:Location.Accuracy.High,distanceInterval:25,timeInterval:10000},async p=>{try{await api(session,"rider/me/location",{method:"POST",body:JSON.stringify({delivery_id:activeDelivery?.id??null,latitude:p.coords.latitude,longitude:p.coords.longitude,accuracy_meters:p.coords.accuracy,speed_mps:p.coords.speed,heading:p.coords.heading})});setGps("live")}catch{setGps("off")}})})();return()=>{dead=true;watcher?.remove()}},[rider?.is_online,activeDelivery?.id,session]);
+useEffect(()=>{let dead=false;let watcher:Location.LocationSubscription|undefined;(async()=>{await AsyncStorage.setItem(ACTIVE_DELIVERY_KEY,activeDelivery?.id??"");if(!rider?.is_online){setGps("off");if(await Location.hasStartedLocationUpdatesAsync(LOCATION_TASK_NAME))await Location.stopLocationUpdatesAsync(LOCATION_TASK_NAME);return}setGps("starting");const foreground=await Location.requestForegroundPermissionsAsync();if(dead||foreground.status!=="granted"){setGps("off");return}let background=false;try{const bg=await Location.requestBackgroundPermissionsAsync();background=bg.status==="granted"}catch{}if(background){if(!(await Location.hasStartedLocationUpdatesAsync(LOCATION_TASK_NAME))){await Location.startLocationUpdatesAsync(LOCATION_TASK_NAME,{accuracy:Location.Accuracy.High,distanceInterval:25,timeInterval:10000,showsBackgroundLocationIndicator:true,foregroundService:{notificationTitle:"WASSLHA Rider",notificationBody:"الموقع خدام أثناء الخدمة",notificationColor:"#111827"}})}setGps("live");return}watcher=await Location.watchPositionAsync({accuracy:Location.Accuracy.High,distanceInterval:25,timeInterval:10000},async p=>{try{await api(session,"rider/me/location",{method:"POST",body:JSON.stringify({delivery_id:activeDelivery?.id??null,latitude:p.coords.latitude,longitude:p.coords.longitude,accuracy_meters:p.coords.accuracy,speed_mps:p.coords.speed,heading:p.coords.heading})});setGps("live")}catch{setGps("off")}})})();return()=>{dead=true;watcher?.remove()}},[rider?.is_online,activeDelivery?.id,session]);
 async function setOnline(value:boolean){try{setRider(await api<Rider>(session,"rider/me/online",{method:"POST",body:JSON.stringify({is_online:value})}));await load(true)}catch(e){Alert.alert("WASSLHA",e instanceof Error?e.message:"تعذر تغيير الحالة")}}
 async function respond(id:string,status:"accepted"|"rejected"){Alert.alert(status==="accepted"?"قبول العرض؟":"رفض العرض؟","القرار غادي يتسجل مباشرة فـDispatch.", [{text:"إلغاء",style:"cancel"},{text:status==="accepted"?"قبول":"رفض",onPress:async()=>{try{await api(session,"rider/me/assignments/"+id+"/respond",{method:"POST",body:JSON.stringify({status})});await load(true)}catch(e){Alert.alert("WASSLHA",e instanceof Error?e.message:"تعذر الرد")}}}])}
 async function transition(id:string,status:DeliveryStatus){setBusy(id);try{await api(session,"rider/me/deliveries/"+id+"/status",{method:"POST",body:JSON.stringify({status,reason:status==="failed"||status==="cancelled"?"rider_operational_reason":undefined})});await load(true)}catch(e){Alert.alert("WASSLHA",e instanceof Error?e.message:"تعذر تحديث التوصيلة")}finally{setBusy(null)}}
