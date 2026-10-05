@@ -16,7 +16,16 @@
     ],
     "android": {
       "package": "ma.wasslha.rider",
-      "versionCode": 1
+      "versionCode": 1,
+      "permissions": [
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_FINE_LOCATION"
+      ]
+    },
+    "ios": {
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "WASSLHA uses your location while you are online for delivery dispatch and active navigation."
+      }
     }
   }
 }
