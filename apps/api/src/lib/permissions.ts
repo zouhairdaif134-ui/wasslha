@@ -53,6 +53,8 @@ export const PERMISSIONS = {
   CUSTOMER_ORDERS_READ: "customer.orders.read",
   CUSTOMER_ORDERS_CREATE: "customer.orders.create",
   CUSTOMER_ORDERS_CANCEL: "customer.orders.cancel",
+  REFUNDS_CREATE: "refunds.create",
+  REFUNDS_MANAGE: "refunds.manage",
 
   GET_REQUEST_CREATE: "get_request.create",
   GET_REQUEST_READ: "get_request.read",
