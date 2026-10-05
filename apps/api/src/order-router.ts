@@ -229,7 +229,7 @@ export async function routeOrders(request: Request, env: unknown, requestId: str
     } else {
       dispatch = {status:"pending"};
     }
-    return ok({...((result.data as Record<string,unknown>) ?? {}), dispatch}, requestId);
+    return ok({...(((result.data as unknown) as Record<string,unknown>) ?? {}), dispatch}, requestId);
   }
 
   return null;
