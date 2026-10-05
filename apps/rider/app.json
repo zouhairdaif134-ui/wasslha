@@ -15,7 +15,8 @@
       ]
     ],
     "android": {
-      "package": "ma.wasslha.rider"
+      "package": "ma.wasslha.rider",
+      "versionCode": 1
     }
   }
 }
