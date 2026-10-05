@@ -14,7 +14,8 @@ begin;
 create or replace function public.guard_immutable_financial_transaction()
 returns trigger
 language plpgsql
-as $$
+set search_path = public
+as $
 begin
   raise exception 'IMMUTABLE_FINANCIAL_RECORD';
 end;
