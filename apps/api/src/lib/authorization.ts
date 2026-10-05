@@ -17,10 +17,10 @@ export interface AuthorizationResult { allowed: boolean; reason: string | null; 
 
 const ROLE_PERMISSIONS: Record<string, readonly Permission[]> = {
   admin: [
-    "admin.dashboard.view","admin.users.read","admin.users.manage","admin.orders.read","admin.orders.update","admin.merchants.read","admin.merchants.manage","admin.riders.read","admin.riders.manage","admin.finance.read","admin.finance.manage","admin.support.read","admin.support.manage","admin.reports.read","admin.settings.read","admin.settings.manage","admin.audit.read",
+    "admin.dashboard.view","admin.users.read","admin.users.manage","admin.orders.read","admin.orders.update","refunds.create","refunds.manage","admin.merchants.read","admin.merchants.manage","admin.riders.read","admin.riders.manage","admin.finance.read","admin.finance.manage","admin.support.read","admin.support.manage","admin.reports.read","admin.settings.read","admin.settings.manage","admin.audit.read",
     "merchant.dashboard.view","merchant.profile.read","merchant.profile.update","merchant.stores.manage","merchant.products.manage","merchant.orders.read","merchant.orders.update",
     "rider.app.access","rider.profile.read","rider.profile.update","rider.slots.read","rider.slots.book","rider.slots.manage","rider.deliveries.read","rider.deliveries.update","rider.location.update","rider.performance.read",
-    "customer.app.access","customer.profile.read","customer.profile.update","customer.addresses.manage","customer.orders.read","customer.orders.create","customer.orders.cancel",
+    "customer.app.access","customer.profile.read","customer.profile.update","customer.addresses.manage","customer.orders.read","customer.orders.create","customer.orders.cancel","refunds.create",
     "get_request.create","get_request.read","get_request.manage","payments.read","payments.create","payments.manage","wallet.read","wallet.manage","support.create","support.read","support.manage","reviews.create","reviews.manage","notifications.read","notifications.manage",
   ],
   merchant: [
