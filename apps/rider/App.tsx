@@ -4,7 +4,7 @@ import * as Location from "expo-location";
 import { createClient, type Session } from "@supabase/supabase-js";
 import { useEffect, useMemo, useState } from "react";
 import { ActivityIndicator, Alert, Linking, Pressable, SafeAreaView, ScrollView, StyleSheet, Switch, Text, TextInput, View } from "react-native";
-import MapView, { Marker, Polyline } from "react-native-maps";
+import MapView, { Marker } from "react-native-maps";
 
 const supabaseUrl=process.env.EXPO_PUBLIC_SUPABASE_URL??"";
 const supabaseAnonKey=process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY??"";
