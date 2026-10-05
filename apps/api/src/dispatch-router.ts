@@ -3,7 +3,7 @@ import { authorize } from "./lib/authorization";
 import { PERMISSIONS } from "./lib/permissions";
 import { errorResponse, successResponse } from "./lib/response";
 import { databaseGet, type DatabaseEnv } from "./lib/database";
-import { offerDelivery } from "./services/dispatch-service";
+import { autoOfferDelivery, offerDelivery } from "./services/dispatch-service";
 import type { ServiceAuthEnv } from "./lib/service-client";
 
 function tokenOf(request: Request) { const value=request.headers.get("Authorization")??""; return value.startsWith("Bearer ")?value.slice(7):""; }
@@ -20,6 +20,7 @@ export async function routeDispatch(request:Request,env:unknown,requestId:string
  const token=tokenOf(request),db=env as DatabaseEnv&ServiceAuthEnv,adminId=context.user!.id;
  if(method==="GET"&&path[2]==="deliveries"){const result=await databaseGet<DeliveryRow[]>("/rest/v1/deliveries?select=id,master_order_id,status,pickup_address_text,delivery_address_text,delivery_latitude,delivery_longitude,created_at&status=eq.pending&order=created_at.asc&limit=100",db,token);if(result.error)return fail("DISPATCH_DELIVERIES_ERROR",result.error,502,requestId);return successResponse(result.data??[],{requestId})}
  if(method==="GET"&&path[2]==="riders"){const result=await databaseGet<RiderRow[]>("/rest/v1/riders?select=id,status,is_online,vehicle_type,vehicle_plate&status=eq.approved&is_online=eq.true&order=updated_at.desc&limit=100",db,token);if(result.error)return fail("DISPATCH_RIDERS_ERROR",result.error,502,requestId);return successResponse(result.data??[],{requestId})}
+ if(method==="POST"&&path[2]==="auto-offer"){const body=await request.json().catch(()=>null) as Record<string,unknown>|null;if(!body||!uuidLike(body.delivery_id))return fail("VALIDATION_ERROR","delivery_id is required UUID",400,requestId);const result=await autoOfferDelivery(body.delivery_id as string,db);if(!result.success)return fail("DISPATCH_AUTO_OFFER_ERROR",result.error??"Unable to auto-dispatch",409,requestId);return successResponse(result.data,{requestId})}
  if(method==="POST"&&path[2]==="offer"){const body=await request.json().catch(()=>null) as Record<string,unknown>|null;if(!body||!uuidLike(body.delivery_id)||!uuidLike(body.rider_id))return fail("VALIDATION_ERROR","delivery_id and rider_id are required UUIDs",400,requestId);const result=await offerDelivery(body.delivery_id as string,body.rider_id as string,adminId,db);if(!result.success)return fail("DISPATCH_OFFER_ERROR",result.error??"Unable to offer delivery",409,requestId);return successResponse(result.data,{requestId})}
  return null;
 }
