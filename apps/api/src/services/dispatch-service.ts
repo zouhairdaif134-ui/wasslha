@@ -17,3 +17,9 @@ export async function respondToAssignment(assignmentId: string, riderId: string,
   if (result.error) return { success: false, data: null, error: result.error };
   return { success: true, data: first(result.data), error: null };
 }
+
+export async function autoOfferDelivery(deliveryId: string, env: DispatchEnv): Promise<DispatchResult<DispatchAssignmentResult>> {
+  const result = await servicePost<DispatchRpcPayload>("/rest/v1/rpc/dispatch_auto_offer_delivery", env, { p_delivery_id: deliveryId });
+  if (result.error) return { success: false, data: null, error: result.error };
+  return { success: true, data: first(result.data), error: null };
+}
