@@ -16,6 +16,8 @@ export interface MasterOrder {
   delivery_fee_minor?: number | null;
   discount_minor?: number | null;
   total_minor?: number | null;
+  service_fee_minor?: number | null;
+  tip_minor?: number | null;
   customer_note?: string | null;
   placed_at?: string | null;
   confirmed_at?: string | null;
@@ -50,6 +52,10 @@ export interface CreateOrderInput {
   payment_method: "cod" | "online";
   customer_note?: string;
   items: CreateOrderItemInput[];
+  delivery_fee_minor?: number;
+  service_fee_minor?: number;
+  discount_minor?: number;
+  tip_minor?: number;
 }
 
 export interface OrderServiceResult<T> {
@@ -77,8 +83,10 @@ export async function createOrder(
       p_customer_note: input.customer_note ?? null,
       p_idempotency_key: idempotencyKey,
       p_items: input.items,
-      p_delivery_fee_minor: 0,
-      p_discount_minor: 0,
+      p_delivery_fee_minor: input.delivery_fee_minor ?? 0,
+      p_discount_minor: input.discount_minor ?? 0,
+      p_service_fee_minor: input.service_fee_minor ?? 0,
+      p_tip_minor: input.tip_minor ?? 0,
     },
   );
 
