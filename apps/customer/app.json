@@ -1,13 +1,22 @@
 {
-"expo": {
-"name": "WASSLHA",
-"slug": "wasslha",
-"version": "0.1.0",
-"orientation": "portrait",
-"userInterfaceStyle": "automatic",
-"scheme": "wasslha",
-"android": {
-"package": "ma.wasslha.customer"
-}
-}
+  "expo": {
+    "name": "WASSLHA",
+    "slug": "wasslha",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "scheme": "wasslha",
+    "plugins": [
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "WASSLHA يحتاج موقعك لاختيار عنوان التوصيل وحساب المسافة ووقت الوصول."
+        }
+      ]
+    ],
+    "android": {
+      "package": "ma.wasslha.customer",
+      "versionCode": 1
+    }
+  }
 }
