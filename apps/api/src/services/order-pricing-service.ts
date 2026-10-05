@@ -8,7 +8,7 @@ type AddressRow={id:string;latitude:number;longitude:number};
 type SettingRow={setting_key:string;setting_value:unknown};
 const num=(v:unknown,d:number)=>{const n=typeof v==="number"?v:Number(typeof v==="string"?v:JSON.stringify(v));return Number.isFinite(n)?n:d};
 export interface Quote {subtotal_minor:number;delivery_fee_minor:number;service_fee_minor:number;discount_minor:number;tip_minor:number;total_minor:number;distance_meters:number;eta_seconds:number;currency:"MAD";route_count:number}
-export async function quoteOrder(customerId:string,addressId:string,items:Item[],env:Env,accessToken:string):Promise<{success:boolean;data:Quote|null;error:string|null}>{
+export async function quoteOrder(customerId:string,addressId:string,items:Item[],env:Env,accessToken:string,tipMinor=0):Promise<{success:boolean;data:Quote|null;error:string|null}>{
  const address=await databaseGet<AddressRow[]>("/rest/v1/addresses?select=id,latitude,longitude&id=eq."+encodeURIComponent(addressId)+"&user_id=eq."+encodeURIComponent(customerId)+"&is_active=eq.true&limit=1",env,accessToken);
  if(address.error)return{success:false,data:null,error:address.error}; const a=address.data?.[0]; if(!a)return{success:false,data:null,error:"DELIVERY_ADDRESS_NOT_FOUND"};
  const ids=[...new Set(items.map(x=>x.product_id))]; const productQuery=ids.map(encodeURIComponent).join(",");
@@ -21,6 +21,7 @@ export async function quoteOrder(customerId:string,addressId:string,items:Item[]
  const base=cfg.get("marketplace.delivery_fee_base_minor")??1500,included=cfg.get("marketplace.delivery_fee_included_km")??2,perKm=cfg.get("marketplace.delivery_fee_per_km_minor")??300,maxFee=cfg.get("marketplace.delivery_fee_max_minor")??4000,bps=cfg.get("marketplace.service_fee_bps")??250,minService=cfg.get("marketplace.service_fee_min_minor")??200,maxService=cfg.get("marketplace.service_fee_max_minor")??2000;
  const stores=[...new Map(rows.map(x=>[x.store_id,x.stores])).values()]; let distance=0,eta=0,routeCount=0;
  for(const store of stores){if(store.latitude==null||store.longitude==null)continue;const route=await calculateRoute({latitude:store.latitude,longitude:store.longitude},{latitude:a.latitude,longitude:a.longitude},env);if(route.success&&route.data){distance+=route.data.distance_meters;eta+=route.data.duration_seconds;routeCount++;}}
+ if(!Number.isInteger(tipMinor)||tipMinor<0||tipMinor>100000)return{success:false,data:null,error:"INVALID_ORDER_AMOUNT"};
  const km=distance/1000; const deliveryFee=Math.min(maxFee,Math.max(0,base+Math.max(0,Math.ceil(km-included))*perKm)); const serviceFee=Math.min(maxService,Math.max(minService,Math.round(subtotal*bps/10000)));
- return{success:true,data:{subtotal_minor:subtotal,delivery_fee_minor:deliveryFee,service_fee_minor:serviceFee,discount_minor:0,tip_minor:0,total_minor:subtotal+deliveryFee+serviceFee,distance_meters:Math.round(distance),eta_seconds:Math.round(eta),currency:"MAD",route_count:routeCount},error:null};
+ return{success:true,data:{subtotal_minor:subtotal,delivery_fee_minor:deliveryFee,service_fee_minor:serviceFee,discount_minor:0,tip_minor:tipMinor,total_minor:subtotal+deliveryFee+serviceFee+tipMinor,distance_meters:Math.round(distance),eta_seconds:Math.round(eta),currency:"MAD",route_count:routeCount},error:null};
 }
