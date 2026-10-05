@@ -9,4 +9,4 @@ export const createAddress=(s:Session,input:Omit<Address,"id"|"is_active">)=>api
 export const updateAddress=(s:Session,id:string,input:Partial<Address>)=>api<Address>(s,"customer/me/addresses/"+id,{method:"PATCH",body:JSON.stringify(input)});
 export const deleteAddress=(s:Session,id:string)=>api<{deleted:boolean}>(s,"customer/me/addresses/"+id,{method:"DELETE"});
 export const createOrder=(s:Session,input:OrderInput,idempotencyKey:string)=>api<unknown>(s,"orders",{method:"POST",headers:{"Idempotency-Key":idempotencyKey},body:JSON.stringify(input)});
-export const getOrders=(s:Session)=>api<unknown[]>(s,"orders");
+export const getOrders=(s:Session)=>api<unknown[]>(s,"customer/me/orders");
