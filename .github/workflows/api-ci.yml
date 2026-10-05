@@ -23,6 +23,7 @@ jobs:
       - run: npm install
       - run: npm run typecheck
       - run: npm test
+
   admin:
     runs-on: ubuntu-latest
     defaults:
@@ -36,6 +37,7 @@ jobs:
       - run: npm install
       - run: npm run typecheck
       - run: npm run build
+
   merchant:
     runs-on: ubuntu-latest
     defaults:
@@ -49,6 +51,7 @@ jobs:
       - run: npm install
       - run: npm run typecheck
       - run: npm run build
+
   rider:
     runs-on: ubuntu-latest
     defaults:
@@ -61,6 +64,8 @@ jobs:
           node-version: 22
       - run: npm install
       - run: npm run typecheck
+      - run: npx expo config --type public
+
   customer:
     runs-on: ubuntu-latest
     defaults:
@@ -73,3 +78,4 @@ jobs:
           node-version: 22
       - run: npm install
       - run: npm run typecheck
+      - run: npx expo config --type public
