@@ -3,6 +3,9 @@ const base = require("./app.json").expo;
 module.exports = {
   expo: {
     ...base,
+    plugins: [
+      ["expo-location", { isAndroidBackgroundLocationEnabled: true, isIosBackgroundLocationEnabled: true, isAndroidForegroundServiceEnabled: true }],
+    ],
     android: {
       ...(base.android || {}),
       config: {
