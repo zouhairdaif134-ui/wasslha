@@ -96,7 +96,7 @@ export async function routeOrders(request: Request, env: unknown, requestId: str
       if (!item || typeof item !== "object" || Array.isArray(item)) return null;
       const x = item as Record<string, unknown>;
       if (!isUuid(x.product_id) || typeof x.quantity !== "number" || !Number.isFinite(x.quantity) || x.quantity <= 0 || x.quantity > 1000) return null;
-      return { product_id: x.product_id, quantity: x.quantity };
+      return { product_id: x.product_id, quantity: x.quantity, variant_id: typeof x.variant_id === "string" && isUuid(x.variant_id) ? x.variant_id : undefined };
     });
     if (items.some((item) => item === null)) return fail("INVALID_ORDER_REQUEST", "One or more order items are invalid", 400, requestId);
     const tip = typeof body.tip_minor === "number" && Number.isInteger(body.tip_minor) ? body.tip_minor : 0;
