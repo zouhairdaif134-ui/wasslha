@@ -2,8 +2,9 @@ import { serviceGet, type ServiceAuthEnv } from "../lib/service-client";
 import { databaseGet, type DatabaseEnv } from "../lib/database";
 import { calculateRoute } from "./maps-service";
 type Env=ServiceAuthEnv & DatabaseEnv & { GOOGLE_MAPS_API_KEY?:string };
-type Item={product_id:string;quantity:number};
+type Item={product_id:string;quantity:number;variant_id?:string};
 type ProductRow={id:string;store_id:string;price_minor:number;is_active:boolean;is_available:boolean;approval_status:string;stock_quantity:number;stores:{id:string;latitude:number|null;longitude:number|null;is_active:boolean;is_accepting_orders:boolean;merchants:{status:string}}};
+type VariantRow={id:string;product_id:string;price_minor:number;stock_quantity:number;is_active:boolean;is_available:boolean};
 type AddressRow={id:string;latitude:number;longitude:number};
 type SettingRow={setting_key:string;setting_value:unknown};
 const num=(v:unknown,d:number)=>{const n=typeof v==="number"?v:Number(typeof v==="string"?v:JSON.stringify(v));return Number.isFinite(n)?n:d};
@@ -14,8 +15,11 @@ export async function quoteOrder(customerId:string,addressId:string,items:Item[]
  const ids=[...new Set(items.map(x=>x.product_id))]; const productQuery=ids.map(encodeURIComponent).join(",");
  const products=await serviceGet<ProductRow[]>("/rest/v1/products?select=id,store_id,price_minor,is_active,is_available,approval_status,stock_quantity,stores!inner(id,latitude,longitude,is_active,is_accepting_orders,merchants!inner(status))&id=in.("+productQuery+")",env);
  if(products.error)return{success:false,data:null,error:products.error}; const rows=products.data??[]; if(rows.length!==ids.length)return{success:false,data:null,error:"PRODUCT_NOT_AVAILABLE"};
- const byId=new Map(rows.map(x=>[x.id,x])); let subtotal=0;
- for(const item of items){const p=byId.get(item.product_id);if(!p||!p.is_active||!p.is_available||p.approval_status!=="approved"||p.stock_quantity<item.quantity||!p.stores.is_active||!p.stores.is_accepting_orders||p.stores.merchants.status!=="approved")return{success:false,data:null,error:"ORDER_NOT_AVAILABLE"};subtotal+=Math.round(p.price_minor*item.quantity);}
+ const byId=new Map(rows.map(x=>[x.id,x]));
+ const variantIds=[...new Set(items.map(x=>x.variant_id).filter((x):x is string=>typeof x==="string"&&x.length>0))];
+ const variants=variantIds.length?await serviceGet<VariantRow[]>("/rest/v1/product_variants?select=id,product_id,price_minor,stock_quantity,is_active,is_available&id=in.("+variantIds.map(encodeURIComponent).join(",")+")",env):{data:[],error:null};
+ if(variants.error)return{success:false,data:null,error:variants.error}; const variantMap=new Map((variants.data??[]).map(x=>[x.id,x])); let subtotal=0;
+ for(const item of items){const p=byId.get(item.product_id);if(!p||!p.is_active||!p.is_available||p.approval_status!=="approved"||!p.stores.is_active||!p.stores.is_accepting_orders||p.stores.merchants.status!=="approved")return{success:false,data:null,error:"ORDER_NOT_AVAILABLE"};const v=item.variant_id?variantMap.get(item.variant_id):null;if(item.variant_id&&(!v||v.product_id!==p.id||!v.is_active||!v.is_available||v.stock_quantity<item.quantity))return{success:false,data:null,error:"ORDER_NOT_AVAILABLE"};if(!v&&p.stock_quantity<item.quantity)return{success:false,data:null,error:"ORDER_NOT_AVAILABLE"};subtotal+=Math.round((v?.price_minor??p.price_minor)*item.quantity);}
  const settings=await serviceGet<SettingRow[]>("/rest/v1/admin_settings?select=setting_key,setting_value&setting_key=in.(marketplace.delivery_fee_base_minor,marketplace.delivery_fee_included_km,marketplace.delivery_fee_per_km_minor,marketplace.delivery_fee_max_minor,marketplace.service_fee_bps,marketplace.service_fee_min_minor,marketplace.service_fee_max_minor)",env);
  if(settings.error)return{success:false,data:null,error:settings.error}; const cfg=new Map((settings.data??[]).map(x=>[x.setting_key,num(x.setting_value,0)]));
  const base=cfg.get("marketplace.delivery_fee_base_minor")??1500,included=cfg.get("marketplace.delivery_fee_included_km")??2,perKm=cfg.get("marketplace.delivery_fee_per_km_minor")??300,maxFee=cfg.get("marketplace.delivery_fee_max_minor")??4000,bps=cfg.get("marketplace.service_fee_bps")??250,minService=cfg.get("marketplace.service_fee_min_minor")??200,maxService=cfg.get("marketplace.service_fee_max_minor")??2000;
