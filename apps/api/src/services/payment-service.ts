@@ -13,7 +13,7 @@ import {
   type DatabaseEnv,
 } from "../lib/database";
 
-export interface PaymentServiceEnv extends DatabaseEnv {}
+export interface PaymentServiceEnv extends DatabaseEnv, ServiceAuthEnv {}
 
 export interface Payment {
   id: string;
@@ -118,4 +118,9 @@ export async function getPaymentTransactions(
     data: result.data ?? [],
     error: null,
   };
+}
+
+export async function initializeOrderPayment(orderId:string,customerId:string,idempotencyKey:string,env:PaymentServiceEnv):Promise<PaymentServiceResult<Payment>>{
+  const r=await servicePost<Payment[]>("/rest/v1/rpc/initialize_order_payment",env,{p_master_order_id:orderId,p_customer_id:customerId,p_idempotency_key:idempotencyKey});
+  return {success:!r.error,data:r.data?.[0]??null,error:r.error};
 }
