@@ -131,6 +131,7 @@ export async function routeOrders(request: Request, env: unknown, requestId: str
           x.quantity <= 0 || x.quantity > 1000) return null;
       return {
         product_id: x.product_id,
+        variant_id: typeof x.variant_id === "string" && isUuid(x.variant_id) ? x.variant_id : undefined,
         quantity: x.quantity,
         notes: typeof x.notes === "string" ? x.notes.trim().slice(0, 500) : undefined,
       };
