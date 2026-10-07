@@ -12,6 +12,7 @@ import {
   databaseGet,
   type DatabaseEnv,
 } from "../lib/database";
+import { servicePost, type ServiceAuthEnv } from "../lib/service-client";
 
 export interface PaymentServiceEnv extends DatabaseEnv, ServiceAuthEnv {}
 
