@@ -100,7 +100,7 @@ export async function routeOrders(request: Request, env: unknown, requestId: str
     });
     if (items.some((item) => item === null)) return fail("INVALID_ORDER_REQUEST", "One or more order items are invalid", 400, requestId);
     const tip = typeof body.tip_minor === "number" && Number.isInteger(body.tip_minor) ? body.tip_minor : 0;
-    const result = await quoteOrder(uid, body.delivery_address_id, items as {product_id:string;quantity:number}[], env as any, token, tip);
+    const result = await quoteOrder(uid, body.delivery_address_id, items as {product_id:string;quantity:number;variant_id?:string}[], env as any, token, tip);
     if (!result.success || !result.data) return fail("ORDER_QUOTE_FAILED", result.error ?? "Unable to quote order", 409, requestId);
     return ok(result.data, requestId);
   }
