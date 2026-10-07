@@ -7,7 +7,7 @@ import { getStore,getPublicStore } from "./services/store-service";
 import { getCustomerOrders,getOrder,getOrderSubOrders,getOrderStatusHistory } from "./services/order-service";
 import { getDeliveryByOrder,getRiderDeliveries,getRiderAssignments,getDeliveryAssignments } from "./services/delivery-service";
 import { getRider,getRiderVehicles } from "./services/rider-service";
-import { getPaymentByOrder,getCustomerPayments,getPaymentTransactions } from "./services/payment-service";
+import { getPaymentByOrder,getCustomerPayments,getPaymentTransactions,initializeOrderPayment } from "./services/payment-service";
 import { getUserWallet,getWalletTransactions } from "./services/wallet-service";
 import { getUserNotifications,markNotificationAsRead } from "./services/notification-service";
 import { getOpenRiderSlots,getRiderWaitlist,getRiderAttendance } from "./services/rider-slot-service";
@@ -48,6 +48,14 @@ export async function routeApi(request:Request,env:unknown,requestId:string):Pro
  if(!isAuthenticated(context))return fail("UNAUTHORIZED",context.error??"Authentication required",401,requestId);
  const token=tokenOf(request),uid=context.user!.id,p=u.pathname.replace(/^\/api\/v1\/?/,"").split("/").filter(Boolean),m=request.method.toUpperCase(),id=p[1];
 
+ if(m==="POST"&&p[0]==="payments"&&id&&p[2]==="initialize"){
+  const denied=guard(context,PERMISSIONS.PAYMENTS_READ,requestId);if(denied)return denied;
+  const key=request.headers.get("Idempotency-Key")?.trim()??"";
+  if(key.length<8||key.length>128)return fail("INVALID_IDEMPOTENCY_KEY","Idempotency-Key must be 8-128 characters",400,requestId);
+  const result=await initializeOrderPayment(id,uid,key,env as any);
+  if(!result.success||!result.data)return fail("PAYMENT_INITIALIZATION_FAILED",result.error??"Unable to initialize payment",409,requestId);
+  return ok(result.data,requestId);
+ }
  if(m==="POST"&&p[0]==="rider"&&id==="me"&&p[2]==="online"){const denied=guard(context,PERMISSIONS.RIDER_PROFILE_UPDATE,requestId);if(denied)return denied;const b=await bodyOf(request);if(typeof b.is_online!=="boolean")return fail("VALIDATION_ERROR","is_online must be boolean",400,requestId);const result=await updateRider(uid,env as any,token,{is_online:b.is_online});if(!result.success)return fail("RIDER_UPDATE_ERROR",result.error??"Unable to update rider",502,requestId);return ok(result.data,requestId)}
  if(m==="POST"&&p[0]==="rider"&&id==="me"&&p[2]==="vehicles"){const denied=guard(context,PERMISSIONS.RIDER_PROFILE_UPDATE,requestId);if(denied)return denied;const b=await bodyOf(request),vehicle_type=stringField(b,"vehicle_type",32);if(!vehicle_type)return fail("VALIDATION_ERROR","vehicle_type is required",400,requestId);const result=await createRiderVehicle(uid,env as any,token,{vehicle_type,make:stringField(b,"make",64),model:stringField(b,"model",64),color:stringField(b,"color",32),plate_number:stringField(b,"plate_number",32),is_primary:b.is_primary===true,is_active:b.is_active!==false});if(!result.success)return fail("RIDER_VEHICLE_CREATE_ERROR",result.error??"Unable to create vehicle",502,requestId);return ok(result.data,requestId)}
  if(m==="POST"&&p[0]==="rider"&&id==="me"&&p[2]==="assignments"&&p[3]&&p[4]==="respond"){const denied=guard(context,PERMISSIONS.RIDER_DELIVERIES_UPDATE,requestId);if(denied)return denied;const b=await bodyOf(request),status=b.status;if(status!=="accepted"&&status!=="rejected")return fail("VALIDATION_ERROR","status must be accepted or rejected",400,requestId);const result=await respondToAssignment(p[3],uid,status,env as any);if(!result.success)return fail("DISPATCH_RESPONSE_ERROR",result.error??"Unable to respond to assignment",502,requestId);return ok(result.data,requestId)}
