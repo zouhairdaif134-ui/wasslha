@@ -8,8 +8,19 @@ on:
       - "apps/**"
       - "supabase/migrations/**"
       - ".github/workflows/**"
+      - "scripts/**"
+      - "docs/database/**"
 
 jobs:
+  migration-integrity:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node scripts/migration-integrity-gate.mjs
+
   api:
     runs-on: ubuntu-latest
     defaults:
