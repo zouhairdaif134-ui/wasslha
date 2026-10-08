@@ -44,6 +44,9 @@ function mapOrderError(error: string | null, requestId: string): Response {
   if (error.includes("DISCOUNT_EXCEEDS_SUBTOTAL")) {
     return fail("INVALID_ORDER_DISCOUNT", error, 400, requestId);
   }
+  if (error.includes("ORDER_PAYMENT_REQUIRED")) {
+    return fail("ORDER_PAYMENT_REQUIRED", "Online payment must be confirmed before the order can proceed", 409, requestId);
+  }
   if (error.includes("MASTER_ORDER_NOT_FOUND")) {
     return fail("ORDER_NOT_FOUND", error, 404, requestId);
   }
@@ -208,6 +211,7 @@ export async function routeOrders(request: Request, env: unknown, requestId: str
       const e = result.error ?? "";
       if (e.includes("SUB_ORDER_NOT_FOUND")) return fail("SUB_ORDER_NOT_FOUND", e, 404, requestId);
       if (e.includes("INVALID_SUB_ORDER_TRANSITION")) return fail("INVALID_ORDER_TRANSITION", e, 409, requestId);
+      if (e.includes("ORDER_PAYMENT_REQUIRED")) return fail("ORDER_PAYMENT_REQUIRED", "Online payment must be confirmed before the order can proceed", 409, requestId);
       return fail("ORDER_OPERATION_FAILED", e || "Sub-order transition failed", 502, requestId);
     }
     let dispatch: {status:string;error?:string} = {status:"not_started"};
