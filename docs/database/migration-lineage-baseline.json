@@ -1,0 +1,87 @@
+{
+  "known_duplicate_timestamps": {
+    "20261004001800": [
+      "20261004001800_dispatch_auto_selection.sql",
+      "20261004001800_gps_privacy_after_pickup.sql",
+      "20261004001800_merchant_operational_controls.sql",
+      "20261004001800_revoke_rider_online_execute.sql",
+      "20261004001800_rider_delivery_workflow.sql",
+      "20261004001800_rider_live_location.sql",
+      "20261004001800_rider_slot_booking.sql",
+      "20261004001800_rider_slot_ownership.sql"
+    ],
+    "20261004001900": [
+      "20261004001900_dispatch_location_index_cleanup.sql",
+      "20261004001900_drop_duplicate_rider_location_index.sql"
+    ],
+    "20261005000100": [
+      "20261005000100_auto_dispatch_cycle.sql",
+      "20261005000100_delivery_assignment_completion.sql",
+      "20261005000100_financial_integrity_hardening.sql",
+      "20261005000100_get_request_purchase_flow.sql",
+      "20261005000100_order_pricing_and_service_fees.sql",
+      "20261005000100_rider_dispatch_acceptance.sql",
+      "20261005000100_rider_live_location_privacy_hardening.sql",
+      "20261005000100_rider_slot_casablanca_timezone_hardening.sql",
+      "20261005000100_rider_waitlist_integrity.sql",
+      "20261005000100_rls_select_policy_consolidation.sql",
+      "20261005000100_security_revoke_purchase_table_public_grants.sql"
+    ],
+    "20261005000200": [
+      "20261005000200_get_request_purchase_fk_indexes.sql",
+      "20261005000200_master_order_suborder_sync.sql",
+      "20261005000200_payment_lifecycle.sql"
+    ],
+    "20261005000300": [
+      "20261005000300_dispatch_readiness_guard.sql",
+      "20261005000300_review_uniqueness.sql"
+    ],
+    "20261005000400": [
+      "20261005000400_dispatch_scheduler_hardening.sql",
+      "20261005000400_rls_auth_initplan_optimization.sql"
+    ]
+  },
+  "known_history_duplicate_names": [
+    "20261002000100_identity_foundation",
+    "20261004000200_communication_rls_correction",
+    "20261004000300_order_state_machine",
+    "20261004000400_get_request_rls_correction",
+    "20261004000500_marketplace_rls_correction",
+    "20261004000600_delivery_rls_correction",
+    "20261004000700_admin_dashboard_read_model",
+    "20261004000800_admin_operational_read_models",
+    "20261004000900_admin_governance_read_model",
+    "20261004001000_dispatch_integrity",
+    "20261004001100_dispatch_concurrency_hardening"
+  ],
+  "history_only_legacy_names": [
+    "order_creation_integrity",
+    "order_idempotency_column_correction",
+    "foreign_key_indexes",
+    "index_cleanup",
+    "rider_live_location",
+    "rider_online_security_hardening",
+    "rider_delivery_workflow",
+    "merchant_operational_controls",
+    "revoke_rider_online_execute",
+    "rider_slot_ownership",
+    "gps_privacy_after_pickup",
+    "rider_slot_booking",
+    "get_request_purchase_flow_20261005",
+    "get_request_purchase_fk_indexes_20261005",
+    "review_uniqueness_20261005",
+    "optimize_rls_auth_initplans_20261005_v3",
+    "move_has_role_out_of_api_schema_20261005",
+    "auto_dispatch_cycle",
+    "order_pricing_and_service_fees",
+    "dispatch_job_hardening",
+    "rider_dispatch_acceptance",
+    "master_order_suborder_sync",
+    "dispatch_readiness_guard",
+    "dispatch_scheduler_hardening",
+    "security_revoke_purchase_table_public_grants",
+    "rider_slot_casablanca_timezone_hardening",
+    "rider_live_location_privacy_hardening",
+    "delivery_assignment_completion"
+  ]
+}
