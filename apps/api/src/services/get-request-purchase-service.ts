@@ -35,20 +35,17 @@ export async function createPurchaseRecord(
 export async function createPurchaseApproval(input:{
   get_request_id:string;
   requested_amount_minor:string;
-  budget_amount_minor:string;
   requested_by:string;
   idempotency_key:string;
   decision_reason?:string|null
 },env:PurchaseServiceEnv){
-  return servicePost<Array<Record<string,unknown>>>("/rest/v1/purchase_approvals",env,{
-    get_request_id:input.get_request_id,
-    requested_amount_minor:input.requested_amount_minor,
-    budget_amount_minor:input.budget_amount_minor,
-    requested_by:input.requested_by,
-    idempotency_key:input.idempotency_key,
-    decision_reason:input.decision_reason??null,
-    status:"pending"
-  });
+  return rpc<Record<string,unknown>>("request_get_request_purchase_approval", {
+    p_get_request_id:input.get_request_id,
+    p_rider_id:input.requested_by,
+    p_requested_amount_minor:input.requested_amount_minor,
+    p_idempotency_key:input.idempotency_key,
+    p_reason:input.decision_reason??null
+  }, env);
 }
 
 export async function decidePurchaseApproval(input:{
