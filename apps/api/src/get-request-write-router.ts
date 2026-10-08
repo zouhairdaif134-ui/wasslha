@@ -4,7 +4,7 @@ import { PERMISSIONS } from "./lib/permissions";
 import { errorResponse, successResponse } from "./lib/response";
 import { databaseGet, type DatabaseEnv } from "./lib/database";
 import { addRequestItem, createGetRequest } from "./services/get-request-service";
-import { addPurchaseReceipt, createPurchaseApproval, createPurchaseRecord, getAcceptedGetRequestRider, getCustomerGetRequest } from "./services/get-request-purchase-service";
+import { addPurchaseReceipt, createPurchaseApproval, createPurchaseRecord, decidePurchaseApproval, getAcceptedGetRequestRider, getCustomerGetRequest } from "./services/get-request-purchase-service";
 
 function tokenOf(request: Request) { const value = request.headers.get("Authorization") ?? ""; return value.startsWith("Bearer ") ? value.slice(7) : ""; }
 function fail(code: string, message: string, status: number, requestId: string) { return errorResponse({ code, message, status }, requestId); }
@@ -25,7 +25,8 @@ export async function routeGetRequestWrites(request: Request, env: unknown, requ
 
   const purchasePath = path.length === 3 && uuid(path[1]);
   const purchase = purchasePath && path[2] === "purchase";
-  const approval = purchasePath && path[2] === "purchase-approval";
+  const approvalRequest = purchasePath && path[2] === "purchase-approval";
+  const approvalDecision = path.length === 4 && uuid(path[1]) && path[2] === "purchase-approval" && path[3] === "decision";
   const receipt = purchasePath && path[2] === "purchase-receipts";
 
   if (purchase || receipt) {
@@ -75,7 +76,7 @@ export async function routeGetRequestWrites(request: Request, env: unknown, requ
     return successResponse(result.data?.[0]??null,{requestId});
   }
 
-  if (approval) {
+  if (approvalRequest) {
     const key = request.headers.get("Idempotency-Key")?.trim() ?? "";
     if (key.length < 8 || key.length > 128) return fail("INVALID_IDEMPOTENCY_KEY", "Idempotency-Key must be 8-128 characters", 400, requestId);
     const requested = minor(body.requested_amount_minor);
@@ -83,8 +84,20 @@ export async function routeGetRequestWrites(request: Request, env: unknown, requ
     const owned = await getCustomerGetRequest(path[1],uid,env as DatabaseEnv,token);
     if (!owned) return fail("FORBIDDEN","Request does not belong to the customer",403,requestId);
     const budget = minor(owned.maximum_product_amount_minor == null ? "0" : String(owned.maximum_product_amount_minor))!;
+    if (BigInt(requested) <= BigInt(budget)) return fail("VALIDATION_ERROR", "Purchase approval is only required above the customer budget", 400, requestId);
     const result = await createPurchaseApproval({get_request_id:path[1],requested_amount_minor:requested,budget_amount_minor:budget,requested_by:uid,idempotency_key:key,decision_reason:text(body.decision_reason,500)??null},env as any);
     if (result.error) return fail("PURCHASE_APPROVAL_ERROR",result.error,409,requestId);
+    return successResponse(result.data?.[0]??null,{requestId});
+  }
+
+  if (approvalDecision) {
+    const decision = body.decision;
+    if (decision !== "approved" && decision !== "rejected") return fail("VALIDATION_ERROR", "decision must be approved or rejected", 400, requestId);
+    const approvalId = path[1];
+    const owned = await databaseGet<Array<{ id:string }>>(`/rest/v1/purchase_approvals?select=id&id=${encodeURIComponent(approvalId)}&requested_by=eq.${encodeURIComponent(uid)}&status=eq.pending&limit=1`, env as DatabaseEnv, token);
+    if (!owned.data?.[0]) return fail("FORBIDDEN", "Purchase approval is not pending for this customer", 403, requestId);
+    const result = await decidePurchaseApproval({ approval_id:approvalId, customer_id:uid, decision, reason:text(body.reason,500)??null },env as any);
+    if (result.error) return fail("PURCHASE_APPROVAL_DECISION_ERROR",result.error,409,requestId);
     return successResponse(result.data?.[0]??null,{requestId});
   }
 
