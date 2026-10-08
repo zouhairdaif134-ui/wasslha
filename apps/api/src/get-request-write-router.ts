@@ -90,7 +90,7 @@ export async function routeGetRequestWrites(request: Request, env: unknown, requ
     const decision = body.decision;
     if (decision !== "approved" && decision !== "rejected") return fail("VALIDATION_ERROR", "decision must be approved or rejected", 400, requestId);
     const approvalId = path[1];
-    const owned = await databaseGet<Array<{ id:string }>>(`/rest/v1/purchase_approvals?select=id&id=${encodeURIComponent(approvalId)}&requested_by=eq.${encodeURIComponent(uid)}&status=eq.pending&limit=1`, env as DatabaseEnv, token);
+    const owned = await databaseGet<Array<{ id:string }>>(`/rest/v1/purchase_approvals?select=id&id=${encodeURIComponent(approvalId)}&status=eq.pending&limit=1`, env as DatabaseEnv, token);
     if (!owned.data?.[0]) return fail("FORBIDDEN", "Purchase approval is not pending for this customer", 403, requestId);
     const result = await decidePurchaseApproval({ approval_id:approvalId, customer_id:uid, decision, reason:text(body.reason,500)??null },env as any);
     if (result.error) return fail("PURCHASE_APPROVAL_DECISION_ERROR",result.error,409,requestId);
