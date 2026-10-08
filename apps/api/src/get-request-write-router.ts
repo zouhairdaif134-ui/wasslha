@@ -29,7 +29,7 @@ export async function routeGetRequestWrites(request: Request, env: unknown, requ
   const approvalDecision = path.length === 4 && uuid(path[1]) && path[2] === "purchase-approval" && path[3] === "decision";
   const receipt = purchasePath && path[2] === "purchase-receipts";
 
-  if (purchase || receipt) {
+  if (purchase || approvalRequest || receipt) {
     const denied = authorize(context, PERMISSIONS.RIDER_DELIVERIES_UPDATE);
     if (!denied.allowed) return fail("FORBIDDEN", denied.reason ?? "Permission denied", 403, requestId);
     if (!await getAcceptedGetRequestRider(path[1], uid, env as DatabaseEnv, token)) return fail("FORBIDDEN", "Rider is not the accepted fulfiller for this request", 403, requestId);
@@ -81,11 +81,7 @@ export async function routeGetRequestWrites(request: Request, env: unknown, requ
     if (key.length < 8 || key.length > 128) return fail("INVALID_IDEMPOTENCY_KEY", "Idempotency-Key must be 8-128 characters", 400, requestId);
     const requested = minor(body.requested_amount_minor);
     if (requested === null || BigInt(requested) <= 0n) return fail("VALIDATION_ERROR", "requested_amount_minor must be positive integer minor units", 400, requestId);
-    const owned = await getCustomerGetRequest(path[1],uid,env as DatabaseEnv,token);
-    if (!owned) return fail("FORBIDDEN","Request does not belong to the customer",403,requestId);
-    const budget = minor(owned.maximum_product_amount_minor == null ? "0" : String(owned.maximum_product_amount_minor))!;
-    if (BigInt(requested) <= BigInt(budget)) return fail("VALIDATION_ERROR", "Purchase approval is only required above the customer budget", 400, requestId);
-    const result = await createPurchaseApproval({get_request_id:path[1],requested_amount_minor:requested,budget_amount_minor:budget,requested_by:uid,idempotency_key:key,decision_reason:text(body.decision_reason,500)??null},env as any);
+    const result = await createPurchaseApproval({get_request_id:path[1],requested_amount_minor:requested,requested_by:uid,idempotency_key:key,decision_reason:text(body.decision_reason,500)??null},env as any);
     if (result.error) return fail("PURCHASE_APPROVAL_ERROR",result.error,409,requestId);
     return successResponse(result.data?.[0]??null,{requestId});
   }
