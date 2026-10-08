@@ -29,7 +29,10 @@ export async function routeGetRequestWrites(request: Request, env: unknown, requ
   const approvalDecision = path.length === 4 && uuid(path[1]) && path[2] === "purchase-approval" && path[3] === "decision";
   const receipt = purchasePath && path[2] === "purchase-receipts";
 
-  if (purchase || approvalRequest || receipt) {
+  if (approvalDecision) {
+    const denied = authorize(context, PERMISSIONS.GET_REQUEST_READ);
+    if (!denied.allowed) return fail("FORBIDDEN", denied.reason ?? "Permission denied", 403, requestId);
+  } else if (purchase || approvalRequest || receipt) {
     const denied = authorize(context, PERMISSIONS.RIDER_DELIVERIES_UPDATE);
     if (!denied.allowed) return fail("FORBIDDEN", denied.reason ?? "Permission denied", 403, requestId);
     if (!await getAcceptedGetRequestRider(path[1], uid, env as DatabaseEnv, token)) return fail("FORBIDDEN", "Rider is not the accepted fulfiller for this request", 403, requestId);
