@@ -91,11 +91,3 @@ export async function getAcceptedGetRequestRider(getRequestId:string,riderId:str
   return result.data?.[0]??null;
 }
 
-export async function getCustomerGetRequest(getRequestId:string,customerId:string,env:DatabaseEnv,accessToken:string){
-  const result=await databaseGet<Array<{id:string;customer_id:string;maximum_product_amount_minor:number|string|null}>>(
-    `/rest/v1/get_requests?select=id,customer_id,maximum_product_amount_minor&id=eq.${encodeURIComponent(getRequestId)}&customer_id=eq.${encodeURIComponent(customerId)}&limit=1`,
-    env,
-    accessToken
-  );
-  return result.data?.[0]??null;
-}
