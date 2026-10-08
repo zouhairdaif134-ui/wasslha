@@ -4,7 +4,7 @@ import { PERMISSIONS } from "./lib/permissions";
 import { errorResponse, successResponse } from "./lib/response";
 import { databaseGet, type DatabaseEnv } from "./lib/database";
 import { addRequestItem, createGetRequest } from "./services/get-request-service";
-import { addPurchaseReceipt, createPurchaseApproval, createPurchaseRecord, decidePurchaseApproval, getAcceptedGetRequestRider, getCustomerGetRequest } from "./services/get-request-purchase-service";
+import { addPurchaseReceipt, createPurchaseApproval, createPurchaseRecord, decidePurchaseApproval, getAcceptedGetRequestRider } from "./services/get-request-purchase-service";
 
 function tokenOf(request: Request) { const value = request.headers.get("Authorization") ?? ""; return value.startsWith("Bearer ") ? value.slice(7) : ""; }
 function fail(code: string, message: string, status: number, requestId: string) { return errorResponse({ code, message, status }, requestId); }
@@ -67,11 +67,7 @@ export async function routeGetRequestWrites(request: Request, env: unknown, requ
     if (key.length < 8 || key.length > 128) return fail("INVALID_IDEMPOTENCY_KEY", "Idempotency-Key must be 8-128 characters", 400, requestId);
     const actual = minor(body.actual_product_amount_minor), reimbursement = minor(body.reimbursement_amount_minor), deliveryFee = minor(body.delivery_fee_minor), serviceFee = minor(body.service_fee_minor), total = minor(body.total_amount_minor);
     if ([actual,reimbursement,deliveryFee,serviceFee,total].some(v => v === null)) return fail("VALIDATION_ERROR", "Financial amounts must be non-negative integer minor units", 400, requestId);
-    const requestRow = await databaseGet<Array<{ id:string; maximum_product_amount_minor:number|string|null }>>(`/rest/v1/get_requests?select=id,maximum_product_amount_minor&id=eq.${path[1]}&limit=1`, env as DatabaseEnv, token);
-    if (!requestRow.data?.[0]) return fail("NOT_FOUND", "Get Request not found", 404, requestId);
-    const budget = requestRow.data[0].maximum_product_amount_minor == null ? null : BigInt(String(requestRow.data[0].maximum_product_amount_minor));
-    if (budget !== null && BigInt(actual!) > budget) return fail("APPROVAL_REQUIRED", "Actual purchase exceeds the customer budget; request approval first", 409, requestId);
-    const result = await createPurchaseRecord({ get_request_id:path[1],rider_id:uid,actual_product_amount_minor:actual!,reimbursement_amount_minor:reimbursement!,delivery_fee_minor:deliveryFee!,service_fee_minor:serviceFee!,total_amount_minor:total!,budget_exceeded:false,idempotency_key:key },env as any);
+    const result = await createPurchaseRecord({ get_request_id:path[1],rider_id:uid,actual_product_amount_minor:actual!,reimbursement_amount_minor:reimbursement!,delivery_fee_minor:deliveryFee!,service_fee_minor:serviceFee!,total_amount_minor:total!,idempotency_key:key },env as any);
     if (result.error) return fail("PURCHASE_CREATE_ERROR",result.error,409,requestId);
     return successResponse(result.data?.[0]??null,{requestId});
   }
