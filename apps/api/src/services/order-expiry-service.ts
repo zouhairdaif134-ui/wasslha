@@ -19,3 +19,23 @@ export async function expireUnpaidOnlineOrders(env: unknown, maxAgeMinutes = 30)
     console.error("expire_unpaid_online_orders crashed", error);
   }
 }
+
+/**
+ * Records the financials (COD cash collection, rider earning, ledger) of any
+ * delivered COD order that was not finalized when the delivery completed.
+ * Never throws.
+ */
+export async function finalizeDeliveredCodOrders(env: unknown, limit = 50): Promise<void> {
+  try {
+    const result = await servicePost<unknown>(
+      "/rest/v1/rpc/finalize_delivered_cod_orders",
+      env as ServiceAuthEnv,
+      { p_limit: limit }
+    );
+    if (result.error) {
+      console.error("finalize_delivered_cod_orders failed", result.error);
+    }
+  } catch (error) {
+    console.error("finalize_delivered_cod_orders crashed", error);
+  }
+}
