@@ -2,6 +2,7 @@
   "expo": {
     "name": "WASSLHA",
     "slug": "wasslha",
+    "owner": "wasslhas-team",
     "version": "0.1.0",
     "orientation": "portrait",
     "userInterfaceStyle": "automatic",
@@ -17,6 +18,11 @@
     "android": {
       "package": "ma.wasslha.customer",
       "versionCode": 1
+    },
+    "extra": {
+      "eas": {
+        "projectId": "45247dc4-2d63-47b8-ab9f-1bf1ab38cc41"
+      }
     }
   }
 }
