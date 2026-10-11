@@ -14,6 +14,7 @@ export interface RbacEnv {
 
 export interface UserRole {
   id: string;
+  /** Role code in lower case: customer | rider | merchant | admin. */
   name: string;
 }
 
@@ -42,9 +43,11 @@ async function queryUserRoles(
 
     // user_roles has two foreign keys to users (user_id and assigned_by), so the
     // embed must name the relationship or PostgREST answers 300 (ambiguous).
+    // roles.code is the stable lower-case identifier (roles.name is a display
+    // label such as "Customer"), and the permission map is keyed by code.
     const response = await fetch(
       `${baseUrl}/rest/v1/user_roles` +
-        `?select=role_id,roles(id,name),users!user_roles_user_id_fkey!inner(is_active)` +
+        `?select=role_id,roles(id,code),users!user_roles_user_id_fkey!inner(is_active)` +
         `&user_id=eq.${encodedUserId}`,
       {
         method: "GET",
@@ -68,7 +71,7 @@ async function queryUserRoles(
       role_id?: string;
       roles?: {
         id?: string;
-        name?: string;
+        code?: string;
       } | null;
       users?: {
         is_active?: boolean;
@@ -90,10 +93,10 @@ async function queryUserRoles(
     const roles: UserRole[] = [];
 
     for (const row of rows) {
-      if (row.roles?.id && row.roles.name) {
+      if (row.roles?.id && row.roles.code) {
         roles.push({
           id: row.roles.id,
-          name: row.roles.name,
+          name: row.roles.code.toLowerCase(),
         });
       }
     }
