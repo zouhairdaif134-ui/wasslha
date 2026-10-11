@@ -40,9 +40,11 @@ async function queryUserRoles(
     const baseUrl = env.SUPABASE_URL.replace(/\/$/, "");
     const encodedUserId = encodeURIComponent(userId);
 
+    // user_roles has two foreign keys to users (user_id and assigned_by), so the
+    // embed must name the relationship or PostgREST answers 300 (ambiguous).
     const response = await fetch(
       `${baseUrl}/rest/v1/user_roles` +
-        `?select=role_id,roles(id,name),users!inner(is_active)` +
+        `?select=role_id,roles(id,name),users!user_roles_user_id_fkey!inner(is_active)` +
         `&user_id=eq.${encodedUserId}`,
       {
         method: "GET",
