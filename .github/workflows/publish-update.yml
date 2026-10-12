@@ -1,0 +1,27 @@
+name: Publish customer app update
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "apps/customer/**"
+  workflow_dispatch:
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/customer
+    env:
+      EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+      EXPO_PUBLIC_API_BASE_URL: https://wasslha-api.berrchidcity99.workers.dev
+      EXPO_PUBLIC_SUPABASE_URL: https://ehlbdmaqhelxiobskxqq.supabase.co
+      EXPO_PUBLIC_SUPABASE_ANON_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVobGJkbWFxaGVseGlvYnNreHFxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTEwNjc1NzAsImV4cCI6MjEwNjY0MzU3MH0.UfTgx1McSbVGr4dt_59OSxpzANy7fbz3NDfv41-0NFc
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install
+      - run: npx eas-cli@latest update --channel preview --message "update ${{ github.sha }}" --non-interactive
