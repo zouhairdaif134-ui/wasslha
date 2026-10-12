@@ -22,7 +22,8 @@
         {
           "locationWhenInUsePermission": "WASSLHA يحتاج موقعك لاختيار عنوان التوصيل وحساب المسافة ووقت الوصول."
         }
-      ]
+      ],
+      "./plugins/with-android-build-fixes"
     ],
     "android": {
       "package": "ma.wasslha.customer",
