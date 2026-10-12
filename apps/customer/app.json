@@ -7,15 +7,6 @@
     "orientation": "portrait",
     "userInterfaceStyle": "automatic",
     "scheme": "wasslha",
-    "runtimeVersion": {
-      "policy": "appVersion"
-    },
-    "updates": {
-      "url": "https://u.expo.dev/45247dc4-2d63-47b8-ab9f-1bf1ab38cc41",
-      "requestHeaders": {
-        "expo-channel-name": "preview"
-      }
-    },
     "plugins": [
       [
         "expo-location",
