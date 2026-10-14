@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { Image, Pressable, StyleSheet, Text, View } from "react-native";
 import { C, ROW, TOP, tileColor } from "../theme";
 
@@ -70,7 +71,7 @@ export function Cover({ uri, emoji, seed, height, radius = 16, width }: {
   );
 }
 
-export function TopBar({ title, onBack, right }: { title: string; onBack: () => void; right?: React.ReactNode }) {
+export function TopBar({ title, onBack, right }: { title: string; onBack: () => void; right?: ReactNode }) {
   return (
     <View style={s.topBar}>
       <Pressable onPress={onBack} hitSlop={10} style={s.roundBtn}><Text style={s.backGlyph}>→</Text></Pressable>
@@ -80,7 +81,7 @@ export function TopBar({ title, onBack, right }: { title: string; onBack: () => 
   );
 }
 
-export function Screen({ children }: { children: React.ReactNode }) {
+export function Screen({ children }: { children: ReactNode }) {
   return <View style={{ flex: 1, backgroundColor: C.bg, paddingTop: TOP }}>{children}</View>;
 }
 
