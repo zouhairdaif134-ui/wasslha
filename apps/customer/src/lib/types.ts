@@ -29,12 +29,10 @@ export type Tracking = {
   latitude: number; longitude: number; recorded_at: string; status: string;
   eta_seconds: number | null; distance_meters: number | null;
 };
+export type Tab = "home" | "explore" | "cart" | "orders" | "profile";
+// Screens pushed on top of a tab (the bottom bar is hidden while one is open).
 export type Screen =
-  | { name: "home" }
   | { name: "category"; category: Category }
   | { name: "store"; store: Store }
   | { name: "search" }
-  | { name: "cart" }
-  | { name: "orders" }
-  | { name: "profile" }
   | { name: "get" };

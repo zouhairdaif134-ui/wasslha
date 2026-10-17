@@ -1,6 +1,10 @@
 import type { ReactNode } from "react";
 import { Image, Pressable, StyleSheet, Text, View } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import { C, ROW, TOP, tileColor } from "../theme";
+import type { Tab } from "../lib/types";
+
+export type IconName = keyof typeof Ionicons.glyphMap;
 
 export function Button({ title, onPress, variant = "primary", disabled = false, small = false }: {
   title: string; onPress: () => void; variant?: "primary" | "soft" | "ghost" | "danger"; disabled?: boolean; small?: boolean;
@@ -27,9 +31,9 @@ export function Pill({ text, tone = "neutral" }: { text: string; tone?: "neutral
   const p =
     tone === "ok" ? { bg: C.okSoft, fg: C.ok }
     : tone === "danger" ? { bg: C.dangerSoft, fg: C.danger }
-    : tone === "warn" ? { bg: C.accentSoft, fg: "#9A6700" }
-    : tone === "info" ? { bg: C.primarySoft, fg: C.primary }
-    : { bg: "#EFEEF5", fg: C.muted };
+    : tone === "warn" ? { bg: "#FFF0E0", fg: "#B45309" }
+    : tone === "info" ? { bg: C.accentSoft, fg: "#8A6100" }
+    : { bg: "#F0F0F0", fg: C.muted };
   return (
     <View style={[s.pill, { backgroundColor: p.bg }]}>
       <Text style={[s.pillText, { color: p.fg }]}>{text}</Text>
@@ -57,7 +61,7 @@ export function Stepper({ quantity, onMinus, onPlus }: { quantity: number; onMin
   );
 }
 
-// Photo when available, otherwise a soft coloured tile with an emoji (merchants will add photos).
+// Photo when available, otherwise a soft coloured tile with an icon (photos are added by the admin).
 export function Cover({ uri, emoji, seed, height, radius = 16, width }: {
   uri?: string | null; emoji: string; seed: string; height: number; radius?: number; width?: number;
 }) {
@@ -74,7 +78,7 @@ export function Cover({ uri, emoji, seed, height, radius = 16, width }: {
 export function TopBar({ title, onBack, right }: { title: string; onBack: () => void; right?: ReactNode }) {
   return (
     <View style={s.topBar}>
-      <Pressable onPress={onBack} hitSlop={10} style={s.roundBtn}><Text style={s.backGlyph}>→</Text></Pressable>
+      <Pressable onPress={onBack} hitSlop={10} style={s.roundBtn}><Ionicons name="arrow-forward" size={22} color={C.ink} /></Pressable>
       <Text style={s.topTitle} numberOfLines={1}>{title}</Text>
       <View style={{ minWidth: 44, alignItems: "center" }}>{right ?? null}</View>
     </View>
@@ -83,6 +87,34 @@ export function TopBar({ title, onBack, right }: { title: string; onBack: () => 
 
 export function Screen({ children }: { children: ReactNode }) {
   return <View style={{ flex: 1, backgroundColor: C.bg, paddingTop: TOP }}>{children}</View>;
+}
+
+const NAV: { tab: Tab; label: string; icon: IconName; active: IconName }[] = [
+  { tab: "home", label: "الرئيسية", icon: "home-outline", active: "home" },
+  { tab: "explore", label: "اكتشف", icon: "compass-outline", active: "compass" },
+  { tab: "cart", label: "السلة", icon: "cart-outline", active: "cart" },
+  { tab: "orders", label: "طلباتي", icon: "receipt-outline", active: "receipt" },
+  { tab: "profile", label: "حسابي", icon: "person-outline", active: "person" },
+];
+
+export function BottomNav({ tab, onTab, cartCount, activeOrders }: { tab: Tab; onTab: (t: Tab) => void; cartCount: number; activeOrders: number }) {
+  return (
+    <View style={s.nav}>
+      {NAV.map((n) => {
+        const on = tab === n.tab;
+        const badge = n.tab === "cart" ? cartCount : n.tab === "orders" ? activeOrders : 0;
+        return (
+          <Pressable key={n.tab} style={s.navItem} onPress={() => onTab(n.tab)} accessibilityLabel={n.label}>
+            <View>
+              <Ionicons name={on ? n.active : n.icon} size={24} color={on ? C.primary : C.muted} />
+              {badge > 0 ? <View style={s.navBadge}><Text style={s.navBadgeText}>{badge}</Text></View> : null}
+            </View>
+            <Text style={[s.navLabel, on && { color: C.primary }]}>{n.label}</Text>
+          </Pressable>
+        );
+      })}
+    </View>
+  );
 }
 
 export const s = StyleSheet.create({
@@ -100,6 +132,10 @@ export const s = StyleSheet.create({
   stepQty: { minWidth: 22, textAlign: "center", fontWeight: "900", color: C.ink },
   topBar: { flexDirection: ROW, alignItems: "center", justifyContent: "space-between", paddingHorizontal: 16, paddingVertical: 10, gap: 8 },
   roundBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: C.card, borderWidth: 1, borderColor: C.line, alignItems: "center", justifyContent: "center" },
-  backGlyph: { fontSize: 22, fontWeight: "800", color: C.ink },
   topTitle: { flex: 1, textAlign: "center", fontSize: 18, fontWeight: "900", color: C.ink },
+  nav: { flexDirection: ROW, backgroundColor: C.card, borderTopWidth: 1, borderTopColor: C.line, paddingTop: 8, paddingBottom: 14 },
+  navItem: { flex: 1, alignItems: "center", gap: 2 },
+  navLabel: { fontSize: 11, color: C.muted, fontWeight: "700" },
+  navBadge: { position: "absolute", top: -4, right: -8, backgroundColor: C.primary, minWidth: 17, height: 17, borderRadius: 9, alignItems: "center", justifyContent: "center", paddingHorizontal: 4 },
+  navBadgeText: { color: "#fff", fontSize: 10, fontWeight: "900" },
 });

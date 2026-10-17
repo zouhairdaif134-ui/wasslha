@@ -1,17 +1,17 @@
 import { I18nManager, Platform, StatusBar } from "react-native";
 
-// WASSLHA identity: violet + warm amber accent (deliberately different from other delivery apps).
+// WASSLHA identity (approved spec): yellow #FFC928, red #E53935, white.
 export const C = {
-  primary: "#6C47FF",
-  primaryDark: "#5330E0",
-  primarySoft: "#EFEBFF",
-  accent: "#FFB020",
-  accentSoft: "#FFF4D9",
-  bg: "#F7F6FB",
+  primary: "#E53935",
+  primaryDark: "#C62828",
+  primarySoft: "#FDECEA",
+  accent: "#FFC928",
+  accentSoft: "#FFF6D6",
+  bg: "#F7F7F7",
   card: "#FFFFFF",
-  ink: "#16122B",
-  muted: "#6E6A85",
-  line: "#E9E6F2",
+  ink: "#222222",
+  muted: "#757575",
+  line: "#EEEEEE",
   ok: "#0E9F6E",
   okSoft: "#E3F7EE",
   danger: "#D92D3B",
@@ -22,7 +22,7 @@ export const TOP = Platform.OS === "android" ? (StatusBar.currentHeight ?? 28) :
 // Arabic content in an LTR layout: reverse rows so the first item sits on the right.
 export const ROW = I18nManager.isRTL ? ("row" as const) : ("row-reverse" as const);
 
-const TILE_COLORS = ["#FFE8D6", "#E2EEFF", "#E6F6E0", "#F3E6FF", "#FFF1C2", "#FFE0E0"];
+const TILE_COLORS = ["#FFF1C2", "#FDEBE9", "#E9F5DC", "#E6F1FB", "#F3E6FF", "#FFE8D6"];
 export const tileColor = (seed: string) => {
   let hash = 0;
   for (let i = 0; i < seed.length; i++) hash = (hash * 31 + seed.charCodeAt(i)) % 997;

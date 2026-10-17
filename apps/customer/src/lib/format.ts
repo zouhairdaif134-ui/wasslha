@@ -19,9 +19,16 @@ export const etaLabel = (meters?: number | null) => {
 };
 
 const CATEGORY_EMOJI: Record<string, string> = {
-  restaurants: "🍔", epicerie: "🛒", boulangerie: "🥐", pharmacie: "💊", "fruits-legumes": "🥬", autres: "✨",
+  restaurants: "🍔", epicerie: "🛒", boulangerie: "🥐", pharmacie: "💊", "fruits-legumes": "🥬", viandes: "🥩", boissons: "🥤", autres: "🏪",
 };
 export const categoryEmoji = (category?: Category | null) => CATEGORY_EMOJI[category?.slug ?? ""] ?? "🛍️";
+
+// Outline icon names (Ionicons) per category slug.
+const CATEGORY_ICON: Record<string, string> = {
+  "fruits-legumes": "nutrition-outline", restaurants: "restaurant-outline", epicerie: "basket-outline", boulangerie: "cafe-outline",
+  viandes: "flame-outline", boissons: "water-outline", autres: "storefront-outline", pharmacie: "medkit-outline",
+};
+export const categoryIcon = (category?: Category | null) => CATEGORY_ICON[category?.slug ?? ""] ?? "pricetag-outline";
 
 export const ORDER_STEPS = ["تم الطلب", "مؤكد", "كيتحضر", "فالطريق", "وصل"];
 export function orderStep(status: string): number {
@@ -39,10 +46,15 @@ export function orderStep(status: string): number {
 }
 export const orderStatusLabel = (status: string) =>
   ({
-    pending: "في انتظار التأكيد", confirmed: "مؤكد", preparing: "كيتحضر", ready_for_pickup: "واجد للاستلام",
-    assigned: "سائق تعيّن", picked_up: "السائق استلمو", out_for_delivery: "فالطريق ليك",
+    pending: "قيد التأكيد", confirmed: "تم التأكيد", preparing: "قيد التحضير", ready_for_pickup: "واجد للاستلام",
+    assigned: "سائق تعيّن", picked_up: "السائق استلمو", out_for_delivery: "فالطريق",
     delivered: "تم التوصيل", cancelled: "ملغى", failed: "تعذر التوصيل",
   } as Record<string, string>)[status] ?? status;
 export const awaitingPayment = (order: Order) =>
   order.payment_method === "online" && order.payment_status !== "paid" && order.status === "pending";
 export const ACTIVE_DELIVERY = ["assigned", "accepted", "at_pickup", "picked_up", "in_transit"];
+
+export const discountPercent = (p: Product) =>
+  p.compare_at_price_minor && p.compare_at_price_minor > p.price_minor
+    ? Math.round((1 - p.price_minor / p.compare_at_price_minor) * 100)
+    : 0;
