@@ -1,10 +1,12 @@
 -- WASSLHA
--- Catalog photos (chosen and uploaded by the admin), customer-app categories, and "most ordered" products.
+-- Catalog photos, categories aligned with the customer app design, and most-ordered products.
 
+-- 1. Image columns (photos are chosen and uploaded by the admin).
 alter table public.stores add column if not exists logo_url text;
 alter table public.stores add column if not exists cover_url text;
 alter table public.products add column if not exists image_url text;
 
+-- 2. Public storage bucket for catalog photos; only admins can write.
 insert into storage.buckets (id, name, public)
 values ('catalog-images', 'catalog-images', true)
 on conflict (id) do nothing;
@@ -25,7 +27,7 @@ create policy "catalog images admin delete" on storage.objects
   for delete to authenticated
   using (bucket_id = 'catalog-images' and public.has_role('admin'));
 
--- Categories aligned with the customer app (the 8th tile, Jib Liya, is a service).
+-- 3. Categories aligned with the customer app design (the 8th tile "Jib Liya" is a service, not a category).
 update public.categories set name_ar = 'المحلات', name_fr = 'Commerces', slug = 'magasins', sort_order = 7 where slug = 'autres';
 delete from public.categories c
  where c.slug = 'pharmacie'
@@ -39,7 +41,7 @@ update public.categories set name_ar = 'المطاعم', sort_order = 2 where sl
 update public.categories set name_ar = 'البقالة', sort_order = 3 where slug = 'epicerie';
 update public.categories set name_ar = 'المخابز والحلويات', sort_order = 4 where slug = 'boulangerie';
 
--- Most ordered products over the last 30 days (real orders only). Service role only.
+-- 4. Most ordered products (real orders only). Service role only; used by the API.
 create or replace function public.popular_product_ids(p_limit integer default 12)
 returns table(product_id uuid, orders_count bigint)
 language sql

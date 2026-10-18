@@ -38,9 +38,9 @@ export async function routeCatalog(request:Request,env:unknown,requestId:string)
   const sort=u.searchParams.get("sort")??"recommended";
 
   if(path[1]==="popular-ids"){
-    const rr=await servicePost<Array<{product_id:string;orders_count:number}>>("/rest/v1/rpc/popular_product_ids",env as ServiceAuthEnv,{p_limit:12});
-    if(rr.error)return fail("CATALOG_POPULAR_ERROR",rr.error,502,requestId);
-    return successResponse((rr.data??[]).map(x=>x.product_id),{requestId});
+    const r=await servicePost<Array<{product_id:string;orders_count:number}>>("/rest/v1/rpc/popular_product_ids",env as ServiceAuthEnv,{p_limit:Math.min(limit||12,30)});
+    if(r.error)return fail("CATALOG_POPULAR_ERROR",r.error,502,requestId);
+    return successResponse((r.data??[]).map(x=>x.product_id),{requestId});
   }
 
   if(path[1]==="stores"){
@@ -55,11 +55,11 @@ export async function routeCatalog(request:Request,env:unknown,requestId:string)
 
   if(path[1]==="products"){
     const q=cleanSearch(u.searchParams.get("q")),storeId=u.searchParams.get("store_id"),categoryId=u.searchParams.get("category_id");
-    const ids=(u.searchParams.get("ids")??"").split(",").map(x=>x.trim()).filter(x=>/^[0-9a-f-]{36}$/i.test(x)).slice(0,30);
+    const idList=(u.searchParams.get("ids")??"").split(",").map(x=>x.trim()).filter(x=>/^[0-9a-f-]{36}$/i.test(x)).slice(0,50);
     const filters=["is_active=eq.true","approval_status=eq.approved","is_available=eq.true"];
     if(storeId&&/^[0-9a-f-]{36}$/i.test(storeId))filters.push(`store_id=eq.${storeId}`);
     if(categoryId&&/^[0-9a-f-]{36}$/i.test(categoryId))filters.push(`category_id=eq.${categoryId}`);
-    if(ids.length)filters.push(`id=in.(${ids.join(",")})`);
+    if(idList.length)filters.push(`id=in.(${idList.join(",")})`);
     if(q){const encoded=encodeURIComponent(`*${q}*`);filters.push(`or=(name_ar.ilike.${encoded},name_fr.ilike.${encoded})`)}
     const r=await databaseGet<ProductRow[]>(`/rest/v1/products?select=id,store_id,category_id,name_ar,name_fr,description_ar,description_fr,price_minor,compare_at_price_minor,currency,stock_unit,is_available,image_url,created_at&${filters.join("&")}&order=created_at.desc&limit=200`,db,token);
     if(r.error)return fail("CATALOG_PRODUCTS_ERROR",r.error,502,requestId);
