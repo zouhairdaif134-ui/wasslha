@@ -1,10 +1,11 @@
 import { errorResponse, successResponse } from "./lib/response";
 import { databaseGet, type DatabaseEnv } from "./lib/database";
+import { servicePost, type ServiceAuthEnv } from "./lib/service-client";
 
 interface CatalogEnv extends DatabaseEnv {}
-type StoreRow={id:string;merchant_id:string;name:string;description?:string|null;address_text?:string|null;latitude?:number|null;longitude?:number|null;is_active:boolean;is_accepting_orders:boolean;created_at?:string};
+type StoreRow={id:string;merchant_id:string;name:string;description?:string|null;address_text?:string|null;latitude?:number|null;longitude?:number|null;logo_url?:string|null;cover_url?:string|null;is_active:boolean;is_accepting_orders:boolean;created_at?:string};
 type ReviewRow={merchant_id:string;rating:number};
-type ProductRow={id:string;store_id:string;category_id?:string|null;name_ar:string;name_fr:string;description_ar?:string|null;description_fr?:string|null;price_minor:number;compare_at_price_minor?:number|null;currency:string;stock_unit:string;is_available:boolean;created_at?:string};
+type ProductRow={id:string;store_id:string;category_id?:string|null;name_ar:string;name_fr:string;description_ar?:string|null;description_fr?:string|null;price_minor:number;compare_at_price_minor?:number|null;currency:string;stock_unit:string;is_available:boolean;image_url?:string|null;created_at?:string};
 type VariantRow={id:string;product_id:string;name_ar:string;name_fr:string;price_minor:number;stock_quantity:number;is_available:boolean;is_active:boolean};
 
 function fail(code:string,message:string,status:number,requestId:string){return errorResponse({code,message,status},requestId)}
@@ -36,8 +37,14 @@ export async function routeCatalog(request:Request,env:unknown,requestId:string)
   const lat=coordinate(u.searchParams.get("lat")),lon=coordinate(u.searchParams.get("lon"));
   const sort=u.searchParams.get("sort")??"recommended";
 
+  if(path[1]==="popular-ids"){
+    const rr=await servicePost<Array<{product_id:string;orders_count:number}>>("/rest/v1/rpc/popular_product_ids",env as ServiceAuthEnv,{p_limit:12});
+    if(rr.error)return fail("CATALOG_POPULAR_ERROR",rr.error,502,requestId);
+    return successResponse((rr.data??[]).map(x=>x.product_id),{requestId});
+  }
+
   if(path[1]==="stores"){
-    const r=await databaseGet<StoreRow[]>(`/rest/v1/stores?select=id,merchant_id,name,description,address_text,latitude,longitude,is_active,is_accepting_orders,created_at&is_active=eq.true&order=created_at.desc&limit=200`,db,token);
+    const r=await databaseGet<StoreRow[]>(`/rest/v1/stores?select=id,merchant_id,name,description,address_text,latitude,longitude,logo_url,cover_url,is_active,is_accepting_orders,created_at&is_active=eq.true&order=created_at.desc&limit=200`,db,token);
     if(r.error)return fail("CATALOG_STORES_ERROR",r.error,502,requestId);
     const rows=r.data??[];
     const ratings=await merchantRatings(db,token,rows.map(x=>x.merchant_id));
@@ -48,11 +55,13 @@ export async function routeCatalog(request:Request,env:unknown,requestId:string)
 
   if(path[1]==="products"){
     const q=cleanSearch(u.searchParams.get("q")),storeId=u.searchParams.get("store_id"),categoryId=u.searchParams.get("category_id");
+    const ids=(u.searchParams.get("ids")??"").split(",").map(x=>x.trim()).filter(x=>/^[0-9a-f-]{36}$/i.test(x)).slice(0,30);
     const filters=["is_active=eq.true","approval_status=eq.approved","is_available=eq.true"];
     if(storeId&&/^[0-9a-f-]{36}$/i.test(storeId))filters.push(`store_id=eq.${storeId}`);
     if(categoryId&&/^[0-9a-f-]{36}$/i.test(categoryId))filters.push(`category_id=eq.${categoryId}`);
+    if(ids.length)filters.push(`id=in.(${ids.join(",")})`);
     if(q){const encoded=encodeURIComponent(`*${q}*`);filters.push(`or=(name_ar.ilike.${encoded},name_fr.ilike.${encoded})`)}
-    const r=await databaseGet<ProductRow[]>(`/rest/v1/products?select=id,store_id,category_id,name_ar,name_fr,description_ar,description_fr,price_minor,compare_at_price_minor,currency,stock_unit,is_available,created_at&${filters.join("&")}&order=created_at.desc&limit=200`,db,token);
+    const r=await databaseGet<ProductRow[]>(`/rest/v1/products?select=id,store_id,category_id,name_ar,name_fr,description_ar,description_fr,price_minor,compare_at_price_minor,currency,stock_unit,is_available,image_url,created_at&${filters.join("&")}&order=created_at.desc&limit=200`,db,token);
     if(r.error)return fail("CATALOG_PRODUCTS_ERROR",r.error,502,requestId);
     const productIds=[...new Set((r.data??[]).map(x=>x.id))];
     const variantMap=new Map<string,VariantRow[]>();
