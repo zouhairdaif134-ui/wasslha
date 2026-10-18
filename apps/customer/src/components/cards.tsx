@@ -2,16 +2,15 @@ import { useState } from "react";
 import { Linking, Modal, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { C, ROW } from "../theme";
 import type { Address, Order, Product, Store, Tracking, Variant } from "../lib/types";
-import { ACTIVE_DELIVERY, ORDER_STEPS, awaitingPayment, distanceLabel, etaLabel, money, orderStatusLabel, orderStep } from "../lib/format";
-import { Button, Cover, Pill, Stepper } from "./ui";
+import { ACTIVE_DELIVERY, ORDER_STEPS, awaitingPayment, distanceLabel, money, orderStatusLabel, orderStep } from "../lib/format";
+import { Button, Cover, Icon, Pill, Stepper } from "./ui";
 
 export function StoreCard({ store, onPress }: { store: Store; onPress: () => void }) {
-  const eta = etaLabel(store.distance_meters);
   const km = distanceLabel(store.distance_meters);
   return (
     <Pressable onPress={onPress} style={k.storeCard}>
       <View>
-        <Cover uri={store.image_url} emoji="🏪" seed={store.name} height={132} radius={0} />
+        <Cover uri={store.cover_url ?? store.logo_url} emoji="🏪" seed={store.name} height={132} radius={0} />
         <View style={k.storeStatus}>
           <Pill text={store.is_accepting_orders ? "مفتوح" : "مغلق"} tone={store.is_accepting_orders ? "ok" : "danger"} />
         </View>
@@ -20,9 +19,8 @@ export function StoreCard({ store, onPress }: { store: Store; onPress: () => voi
         <Text style={k.storeName} numberOfLines={1}>{store.name}</Text>
         <Text style={k.sub} numberOfLines={1}>{store.address_text}</Text>
         <View style={k.metaRow}>
-          <Text style={k.meta}>{store.rating ? `⭐ ${store.rating.toFixed(1)}` : "✨ جديد"}</Text>
-          {eta ? <Text style={k.meta}>🕒 {eta}</Text> : null}
-          {km ? <Text style={k.meta}>📍 {km}</Text> : null}
+          <View style={k.metaItem}><Icon name="star" size={14} color={C.accent} /><Text style={k.meta}>{store.rating ? store.rating.toFixed(1) : "جديد"}</Text></View>
+          {km ? <View style={k.metaItem}><Icon name="map-marker-outline" size={14} color={C.muted} /><Text style={k.meta}>{km}</Text></View> : null}
         </View>
       </View>
     </Pressable>
@@ -82,13 +80,13 @@ function ProductSheetBody({ product, emoji, onClose, onAdd }: {
         <Text style={k.sheetTitle}>{product.name_ar}</Text>
         {product.name_fr ? <Text style={k.sub}>{product.name_fr}</Text> : null}
         {product.description_ar ? <Text style={[k.sub, { marginTop: 6 }]}>{product.description_ar}</Text> : null}
-        <Text style={[k.price, { marginTop: 10, fontSize: 18 }]}>{money(unit)}</Text>
+        <Text style={[k.price, { marginTop: 10, fontSize: 18 }]}>{money(unit)}{product.stock_unit && product.stock_unit !== "unit" ? ` / ${product.stock_unit}` : ""}</Text>
         {variants.length > 0 ? (
           <View style={{ marginTop: 12 }}>
             <Text style={k.groupLabel}>اختار</Text>
             {variants.map((v) => (
               <Pressable key={v.id} disabled={!v.is_available} onPress={() => setVariantId(v.id)} style={[k.variantRow, variantId === v.id && k.variantRowOn, !v.is_available && { opacity: 0.4 }]}>
-                <Text style={[k.radio, variantId === v.id && { color: C.primary }]}>{variantId === v.id ? "●" : "○"}</Text>
+                <Icon name={variantId === v.id ? "radiobox-marked" : "radiobox-blank"} size={20} color={variantId === v.id ? C.primary : C.muted} />
                 <Text style={k.variantName}>{v.name_ar}</Text>
                 <Text style={k.variantPrice}>{money(v.price_minor)}</Text>
               </Pressable>
@@ -110,9 +108,9 @@ function ProductSheetBody({ product, emoji, onClose, onAdd }: {
   );
 }
 
-export function CartBar({ count, total, onPress }: { count: number; total: number; onPress: () => void }) {
+export function CartBar({ count, total, onPress, lift = false }: { count: number; total: number; onPress: () => void; lift?: boolean }) {
   return (
-    <Pressable onPress={onPress} style={k.cartBar}>
+    <Pressable onPress={onPress} style={[k.cartBar, lift && { bottom: 88 }]}>
       <View style={k.cartCount}><Text style={k.cartCountText}>{count}</Text></View>
       <Text style={k.cartBarText}>عرض السلة</Text>
       <Text style={k.cartBarText}>{money(total)}</Text>
@@ -133,16 +131,16 @@ export function AddressSheet({ visible, addresses, selected, onSelect, onLocate,
           {addresses.length === 0 ? <Text style={[k.sub, { textAlign: "center", marginVertical: 12 }]}>ما عندك حتى عنوان. استعمل موقعك الحالي.</Text> : null}
           {addresses.map((a) => (
             <Pressable key={a.id} onPress={() => { onSelect(a.id); onClose(); }} style={[k.addressRow, selected === a.id && k.addressRowOn]}>
-              <Text style={{ fontSize: 20 }}>📍</Text>
+              <Icon name="map-marker-outline" size={22} color={C.primary} />
               <View style={{ flex: 1 }}>
                 <Text style={k.addressTitle}>{a.label || "العنوان"}</Text>
                 <Text style={k.sub} numberOfLines={1}>{a.address_text}</Text>
               </View>
-              <Text style={{ color: C.primary, fontSize: 18 }}>{selected === a.id ? "●" : "○"}</Text>
+              <Icon name={selected === a.id ? "radiobox-marked" : "radiobox-blank"} size={20} color={selected === a.id ? C.primary : C.muted} />
             </Pressable>
           ))}
         </ScrollView>
-        <Button title={busy ? "..." : "📍 استعمل موقعي الحالي"} onPress={onLocate} disabled={busy} />
+        <Button title={busy ? "..." : "استعمل موقعي الحالي"} onPress={onLocate} disabled={busy} />
       </View>
     </Modal>
   );
@@ -203,14 +201,15 @@ const k = StyleSheet.create({
   sub: { color: C.muted, fontSize: 13, lineHeight: 19, textAlign: "right" },
   rowBetween: { flexDirection: ROW, alignItems: "center", justifyContent: "space-between", gap: 10 },
 
-  storeCard: { backgroundColor: C.card, borderRadius: 22, borderWidth: 1, borderColor: C.line, marginBottom: 14, overflow: "hidden" },
+  storeCard: { backgroundColor: C.card, borderRadius: 18, borderWidth: 1, borderColor: C.line, marginBottom: 14, overflow: "hidden" },
   storeStatus: { position: "absolute", top: 10, right: 10 },
   storeBody: { padding: 14 },
   storeName: { fontSize: 17, fontWeight: "900", color: C.ink, textAlign: "right" },
   metaRow: { flexDirection: ROW, gap: 14, marginTop: 8, flexWrap: "wrap" },
+  metaItem: { flexDirection: ROW, alignItems: "center", gap: 4 },
   meta: { color: C.muted, fontWeight: "700", fontSize: 13 },
 
-  productRow: { flexDirection: ROW, alignItems: "center", gap: 12, backgroundColor: C.card, borderRadius: 20, borderWidth: 1, borderColor: C.line, padding: 12, marginBottom: 10 },
+  productRow: { flexDirection: ROW, alignItems: "center", gap: 12, backgroundColor: C.card, borderRadius: 18, borderWidth: 1, borderColor: C.line, padding: 12, marginBottom: 10 },
   productName: { fontSize: 15, fontWeight: "900", color: C.ink, textAlign: "right" },
   priceRow: { flexDirection: ROW, alignItems: "center", gap: 8, marginTop: 6 },
   price: { fontSize: 15, fontWeight: "900", color: C.primary, textAlign: "right" },
@@ -220,7 +219,7 @@ const k = StyleSheet.create({
   plusText: { color: "#fff", fontSize: 18, fontWeight: "900", marginTop: -1 },
 
   backdrop: { flex: 1, backgroundColor: "rgba(10,8,25,0.45)" },
-  sheet: { backgroundColor: C.card, borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 18, paddingBottom: 26 },
+  sheet: { backgroundColor: C.card, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 18, paddingBottom: 26 },
   handle: { alignSelf: "center", width: 44, height: 5, borderRadius: 3, backgroundColor: C.line, marginBottom: 12 },
   sheetTitle: { fontSize: 20, fontWeight: "900", color: C.ink, textAlign: "right", marginTop: 12 },
   sheetFooter: { flexDirection: ROW, alignItems: "center", gap: 12, marginTop: 12 },
@@ -229,18 +228,17 @@ const k = StyleSheet.create({
   variantRowOn: { borderColor: C.primary, backgroundColor: C.primarySoft },
   variantName: { flex: 1, fontWeight: "800", color: C.ink, textAlign: "right" },
   variantPrice: { fontWeight: "800", color: C.ink },
-  radio: { fontSize: 18, color: C.muted },
 
   addressRow: { flexDirection: ROW, alignItems: "center", gap: 10, borderWidth: 1, borderColor: C.line, borderRadius: 14, padding: 12, marginVertical: 5, backgroundColor: C.card },
   addressRowOn: { borderColor: C.primary, backgroundColor: C.primarySoft },
   addressTitle: { fontWeight: "900", color: C.ink, textAlign: "right" },
 
-  cartBar: { position: "absolute", left: 16, right: 16, bottom: 24, backgroundColor: C.ink, borderRadius: 20, paddingHorizontal: 16, paddingVertical: 15, flexDirection: ROW, alignItems: "center", justifyContent: "space-between" },
-  cartCount: { backgroundColor: C.primary, borderRadius: 12, minWidth: 26, height: 26, alignItems: "center", justifyContent: "center", paddingHorizontal: 6 },
-  cartCountText: { color: "#fff", fontWeight: "900" },
+  cartBar: { position: "absolute", left: 16, right: 16, bottom: 24, backgroundColor: C.ink, borderRadius: 16, paddingHorizontal: 16, paddingVertical: 15, flexDirection: ROW, alignItems: "center", justifyContent: "space-between" },
+  cartCount: { backgroundColor: C.accent, borderRadius: 12, minWidth: 26, height: 26, alignItems: "center", justifyContent: "center", paddingHorizontal: 6 },
+  cartCountText: { color: C.ink, fontWeight: "900" },
   cartBarText: { color: "#fff", fontWeight: "900", fontSize: 15 },
 
-  orderCard: { backgroundColor: C.card, borderRadius: 20, borderWidth: 1, borderColor: C.line, padding: 14, marginBottom: 12 },
+  orderCard: { backgroundColor: C.card, borderRadius: 18, borderWidth: 1, borderColor: C.line, padding: 14, marginBottom: 12 },
   orderTitle: { fontSize: 15, fontWeight: "900", color: C.ink },
   orderTotal: { fontSize: 20, fontWeight: "900", color: C.ink, marginTop: 6, textAlign: "right" },
   timeline: { flexDirection: ROW, justifyContent: "space-between", marginTop: 14 },
@@ -248,7 +246,7 @@ const k = StyleSheet.create({
   dot: { width: 12, height: 12, borderRadius: 6, backgroundColor: C.line, marginBottom: 6 },
   dotOn: { backgroundColor: C.primary },
   timelineLabel: { fontSize: 10, color: C.muted, textAlign: "center" },
-  trackBox: { flexDirection: ROW, alignItems: "center", gap: 10, backgroundColor: C.primarySoft, borderRadius: 14, padding: 12, marginTop: 12 },
+  trackBox: { flexDirection: ROW, alignItems: "center", gap: 10, backgroundColor: C.accentSoft, borderRadius: 14, padding: 12, marginTop: 12 },
   trackTitle: { fontWeight: "900", color: C.ink, textAlign: "right" },
   live: { color: C.ok, fontSize: 11, fontWeight: "800", textAlign: "right", marginTop: 4 },
 });
