@@ -5,9 +5,12 @@ import type { Session } from "@supabase/supabase-js";
 import { supabase, supabaseConfigured } from "./src/lib/supabase";
 import { API, ONLINE_PAYMENTS_ENABLED, api, idempotencyKey, list } from "./src/lib/http";
 import { ACTIVE_DELIVERY, categoryEmoji, lineKey, lineUnit } from "./src/lib/format";
+import { reverseGeocode } from "./src/lib/geo";
 import type { Address, CartLine, Category, GetRequest, Order, Product, Quote, Screen, Store, Tracking, Variant } from "./src/lib/types";
 import { C, TOP } from "./src/theme";
-import { AddressSheet, CartBar, ProductSheet } from "./src/components/cards";
+import { CartBar, ProductSheet } from "./src/components/cards";
+import { AddressSheetV2, MapPicker } from "./src/components/AddressPicker";
+import type { PickedPlace } from "./src/components/AddressPicker";
 import { BottomNav } from "./src/components/nav";
 import type { TabKey } from "./src/components/nav";
 import { AuthScreen } from "./src/screens/AuthScreen";
@@ -80,6 +83,7 @@ function Shell({ session }: { session: Session }) {
   const [error, setError] = useState("");
   const [toast, setToast] = useState("");
   const [addressSheet, setAddressSheet] = useState(false);
+  const [mapOpen, setMapOpen] = useState(false);
   const [sheetProduct, setSheetProduct] = useState<Product | null>(null);
 
   const [catStores, setCatStores] = useState<Store[]>([]);
@@ -323,10 +327,12 @@ function Shell({ session }: { session: Session }) {
       const { latitude, longitude } = pos.coords;
       const near = addresses.find((a) => Math.abs(Number(a.latitude) - latitude) < 0.0003 && Math.abs(Number(a.longitude) - longitude) < 0.0003);
       if (near) { setAddress(near.id); setAddressSheet(false); notify("تم اختيار موقعك الحالي ✓"); return; }
+      let readable = "";
+      try { readable = await reverseGeocode(latitude, longitude); } catch { /* keep coordinates fallback */ }
       const created = await api<Address>("customer/me/addresses", session, {
         method: "POST",
         body: JSON.stringify({
-          label: "موقعي", address_text: `موقعي (${latitude.toFixed(4)}, ${longitude.toFixed(4)})`,
+          label: "موقعي", address_text: readable || `موقعي (${latitude.toFixed(4)}, ${longitude.toFixed(4)})`,
           latitude, longitude, is_default: addresses.length === 0,
         }),
       });
@@ -337,6 +343,20 @@ function Shell({ session }: { session: Session }) {
     } catch (e) {
       Alert.alert("الموقع", e instanceof Error ? e.message : "تعذر تحديد الموقع");
     } finally { setBusy(false); }
+  }
+  async function savePicked(p: PickedPlace) {
+    const created = await api<Address>("customer/me/addresses", session, {
+      method: "POST",
+      body: JSON.stringify({
+        label: "عنوان على الخريطة", address_text: p.address_text,
+        latitude: p.latitude, longitude: p.longitude, is_default: addresses.length === 0,
+      }),
+    });
+    setAddresses((v) => [created, ...v]);
+    setAddress(created.id);
+    setMapOpen(false);
+    setAddressSheet(false);
+    notify("تم حفظ العنوان ✓");
   }
 
   /* ── orders ── */
@@ -444,7 +464,17 @@ function Shell({ session }: { session: Session }) {
       <View style={{ flex: 1 }}>{body}</View>
       {isTab ? <BottomNav active={screen.name as TabKey} cartCount={cartCount} onChange={goTab} /> : null}
       <ProductSheet product={sheetProduct} emoji={sheetProduct ? emojiOf(sheetProduct) : "🛍️"} onClose={() => setSheetProduct(null)} onAdd={addLine} />
-      <AddressSheet visible={addressSheet} addresses={addresses} selected={address} onSelect={setAddress} onLocate={() => void useMyLocation()} onClose={() => setAddressSheet(false)} busy={busy} />
+      <AddressSheetV2
+        visible={addressSheet} addresses={addresses} selected={address} onSelect={setAddress}
+        onLocate={() => void useMyLocation()} onPickMap={() => { setAddressSheet(false); setMapOpen(true); }}
+        onClose={() => setAddressSheet(false)} busy={busy}
+      />
+      <MapPicker
+        visible={mapOpen}
+        initial={current && Number.isFinite(Number(current.latitude)) && Number.isFinite(Number(current.longitude)) ? { latitude: Number(current.latitude), longitude: Number(current.longitude) } : null}
+        onClose={() => setMapOpen(false)}
+        onConfirm={savePicked}
+      />
       {toast ? <View style={st.toast}><Text style={st.toastText}>{toast}</Text></View> : null}
     </View>
   );
