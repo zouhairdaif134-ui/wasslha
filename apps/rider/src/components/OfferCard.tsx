@@ -1,12 +1,24 @@
+import { useEffect, useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import { C } from "../theme";
 import type { Assignment, Delivery, Pos } from "../lib/types";
 import { distanceKm, kmLabel, money, orderCode, pointOf } from "../lib/format";
 import { Button, Card, Chip, Row } from "./ui";
 
+const OFFER_SECONDS = 60; // same timeout the dispatcher uses before re-offering the order
+
 export function OfferCard({ a, d, pos, busy, onRespond }: {
   a: Assignment; d?: Delivery; pos: Pos | null; busy: boolean; onRespond: (id: string, status: "accepted" | "rejected") => void;
 }) {
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, []);
+  const started = a.offered_at ? Date.parse(a.offered_at) : NaN;
+  const left = Number.isFinite(started) ? Math.min(OFFER_SECONDS, Math.max(0, OFFER_SECONDS - Math.floor((now - started) / 1000))) : null;
+  const expired = left === 0;
+
   const pickup = d ? pointOf(d.pickup_latitude, d.pickup_longitude) : null;
   const customer = d ? pointOf(d.delivery_latitude, d.delivery_longitude) : null;
   const toStore = pos && pickup ? distanceKm(pos, pickup) : null;
@@ -16,7 +28,7 @@ export function OfferCard({ a, d, pos, busy, onRespond }: {
     <Card>
       <Row>
         <Text style={s.code}>{d ? orderCode(d.master_order_id) : "طلب جديد"}</Text>
-        <Chip text="عرض جديد" tone="warn" />
+        {left != null ? <Chip text={expired ? "انتهى العرض" : `باقي ${left} ث`} tone={expired ? "danger" : left <= 15 ? "danger" : "warn"} /> : <Chip text="عرض جديد" tone="warn" />}
       </Row>
       {d ? (
         <>
@@ -30,8 +42,8 @@ export function OfferCard({ a, d, pos, busy, onRespond }: {
         </>
       ) : null}
       <Row>
-        <View style={{ flex: 1 }}><Button title="رفض" variant="soft" disabled={busy} onPress={() => onRespond(a.id, "rejected")} /></View>
-        <View style={{ flex: 2 }}><Button title={busy ? "..." : "قبول"} disabled={busy} onPress={() => onRespond(a.id, "accepted")} /></View>
+        <View style={{ flex: 1 }}><Button title="رفض" variant="soft" disabled={busy || expired} onPress={() => onRespond(a.id, "rejected")} /></View>
+        <View style={{ flex: 2 }}><Button title={busy ? "..." : expired ? "انتهى العرض" : "قبول"} disabled={busy || expired} onPress={() => onRespond(a.id, "accepted")} /></View>
       </Row>
     </Card>
   );

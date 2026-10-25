@@ -45,7 +45,9 @@ export async function startBackground(): Promise<boolean> {
     if (!(await Location.hasStartedLocationUpdatesAsync(LOCATION_TASK))) {
       await Location.startLocationUpdatesAsync(LOCATION_TASK, {
         accuracy: Location.Accuracy.High,
-        distanceInterval: 25,
+        // distanceInterval 0 = time based. Dispatch only offers orders to riders whose last position is < 2 min old,
+        // so a rider standing still must keep reporting too.
+        distanceInterval: 0,
         timeInterval: 10000,
         showsBackgroundLocationIndicator: true,
         foregroundService: { notificationTitle: "WASSLHA Rider", notificationBody: "الموقع خدام أثناء الخدمة", notificationColor: "#E53935" },

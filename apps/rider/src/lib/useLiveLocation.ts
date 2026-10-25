@@ -8,7 +8,8 @@ import type { Pos } from "./types";
 export type Gps = "off" | "starting" | "live";
 
 // While the rider is online: keeps the on-screen position fresh and makes sure the backend receives it
-// (background task when permitted, otherwise foreground updates).
+// (background task when permitted, otherwise foreground updates) plus a 30 s heartbeat, because dispatch
+// ignores riders whose last position is older than 2 minutes.
 export function useLiveLocation(session: Session, online: boolean, deliveryId: string | null) {
   const [pos, setPos] = useState<Pos | null>(null);
   const [gps, setGps] = useState<Gps>("off");
@@ -18,6 +19,8 @@ export function useLiveLocation(session: Session, online: boolean, deliveryId: s
   useEffect(() => {
     let dead = false;
     let sub: Location.LocationSubscription | undefined;
+    let beat: ReturnType<typeof setInterval> | undefined;
+    const last: { c: Location.LocationObjectCoords | null } = { c: null };
     (async () => {
       await AsyncStorage.setItem(ACTIVE_DELIVERY_KEY, deliveryId ?? "");
       if (!online) { setGps("off"); await stopBackground(); return; }
@@ -27,16 +30,19 @@ export function useLiveLocation(session: Session, online: boolean, deliveryId: s
       const background = await startBackground();
       if (dead) return;
       const watcher = await Location.watchPositionAsync(
-        { accuracy: Location.Accuracy.High, distanceInterval: 15, timeInterval: 8000 },
+        { accuracy: Location.Accuracy.High, distanceInterval: 0, timeInterval: 8000 },
         (p) => {
+          last.c = p.coords;
           setPos({ latitude: p.coords.latitude, longitude: p.coords.longitude });
           setGps("live");
           if (!background) void postLocation(tokenRef.current, deliveryId, p.coords);
         }
       );
-      if (dead) watcher.remove(); else sub = watcher;
+      if (dead) { watcher.remove(); return; }
+      sub = watcher;
+      beat = setInterval(() => { if (last.c) void postLocation(tokenRef.current, deliveryId, last.c); }, 30000);
     })();
-    return () => { dead = true; sub?.remove(); };
+    return () => { dead = true; sub?.remove(); if (beat) clearInterval(beat); };
   }, [online, deliveryId]);
 
   return { pos, gps };
