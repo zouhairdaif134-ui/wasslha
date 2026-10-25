@@ -5,6 +5,7 @@ import { supabase } from "./lib/supabase";
 import { api, list } from "./lib/http";
 import { friendlyError } from "./lib/errors";
 import { FINISHED } from "./lib/format";
+import { getVibrate } from "./lib/prefs";
 import { stopBackground } from "./lib/tracking";
 import { useLiveLocation } from "./lib/useLiveLocation";
 import type { Assignment, Cash, Delivery, DeliveryStatus, Earnings, Performance, Rider, Slot, Tab, Wallet } from "./lib/types";
@@ -94,7 +95,7 @@ export function RiderApp({ session }: { session: Session }) {
       const offeredNow = rows.filter((x) => x.status === "offered").map((x) => x.id);
       const seen = seenOffers.current;
       if (seen && offeredNow.some((id) => !seen.has(id))) {
-        Vibration.vibrate([0, 500, 250, 500]);
+        if (await getVibrate()) Vibration.vibrate([0, 500, 250, 500]);
         notify("عرض جديد! 🛵");
       }
       seenOffers.current = new Set(offeredNow);
@@ -226,7 +227,7 @@ export function RiderApp({ session }: { session: Session }) {
       body = <SlotsScreen slots={slots} mine={mine} busyKey={slotBusy} refreshing={refreshing} onRefresh={refresh} onBook={bookSlot} onWaitlist={joinWaitlist} onQuickBook={quickBook} />;
       break;
     case "earnings":
-      body = <EarningsScreen wallet={wallet} cash={cash} earnings={earnings} perf={perf[0] ?? null} refreshing={refreshing} onRefresh={refresh} />;
+      body = <EarningsScreen riderId={session.user.id} wallet={wallet} cash={cash} earnings={earnings} perf={perf[0] ?? null} refreshing={refreshing} onRefresh={refresh} />;
       break;
     case "profile":
       body = <ProfileScreen session={session} rider={rider} gps={gps} onSignOut={() => void signOut()} />;
