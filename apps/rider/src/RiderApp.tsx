@@ -122,7 +122,18 @@ export function RiderApp({ session }: { session: Session }) {
     try {
       await api("rider/me/online", session, { method: "POST", body: JSON.stringify({ is_online: value }) });
     } catch (e) {
-      Alert.alert("WASSLHA", e instanceof Error ? e.message : "تعذر تغيير الحالة");
+      const msg = e instanceof Error ? e.message : "";
+      if (msg.includes("ACTIVE_SLOT_REQUIRED")) {
+        Alert.alert(
+          "خاصك Slot فالوقت الحالي",
+          "باش تفعّل Online خاصك Slot محجوز كيغطي الوقت ديال دابا. احجز واحد أو أنشئ واحد جديد.",
+          [{ text: "إلغاء", style: "cancel" }, { text: "فتح Slots", onPress: () => setTab("slots") }]
+        );
+      } else if (msg.includes("RIDER_NOT_APPROVED")) {
+        Alert.alert("حسابك ما تفعّلش", "الإدارة خاصها توافق على حسابك قبل.");
+      } else {
+        Alert.alert("WASSLHA", msg || "تعذر تغيير الحالة");
+      }
     }
     await load("poll");
   }
@@ -215,7 +226,8 @@ export function RiderApp({ session }: { session: Session }) {
         <HomeScreen
           rider={rider} online={online} onToggle={(v) => void setOnline(v)} gps={gps} pos={pos} active={active} offers={offers}
           cash={cash} earnings={earnings} delivered={deliveries.filter((d) => d.status === "delivered").length}
-          busyId={busy} refreshing={refreshing} onRefresh={refresh} onRespond={respond} onStatus={(s, r) => void transition(s, r)}
+          busyId={busy} refreshing={refreshing} onRefresh={refresh} onOpenSlots={() => setTab("slots")}
+          onRespond={respond} onStatus={(s, r) => void transition(s, r)}
         />
       );
   }
