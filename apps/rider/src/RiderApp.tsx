@@ -3,6 +3,7 @@ import { ActivityIndicator, Alert, AppState, StyleSheet, Text, Vibration, View }
 import type { Session } from "@supabase/supabase-js";
 import { supabase } from "./lib/supabase";
 import { api, list } from "./lib/http";
+import { friendlyError } from "./lib/errors";
 import { FINISHED } from "./lib/format";
 import { stopBackground } from "./lib/tracking";
 import { useLiveLocation } from "./lib/useLiveLocation";
@@ -42,6 +43,7 @@ export function RiderApp({ session }: { session: Session }) {
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [deliveries, setDeliveries] = useState<Delivery[]>([]);
   const [slots, setSlots] = useState<Slot[]>([]);
+  const [mine, setMine] = useState<Set<string>>(new Set());
   const [earnings, setEarnings] = useState<Earnings>(null);
   const [wallet, setWallet] = useState<Wallet>(null);
   const [cash, setCash] = useState<Cash>(null);
@@ -74,7 +76,7 @@ export function RiderApp({ session }: { session: Session }) {
     if (mode === "initial") setLoading(true);
     if (mode === "manual") setRefreshing(true);
     const s = sessionRef.current;
-    const [rid, asg, del, slt, ear, wal, per, csh] = await Promise.all([
+    const [rid, asg, del, slt, ear, wal, per, csh, att] = await Promise.all([
       ok(api<Rider | null>("rider/me", s)),
       ok(api<unknown>("rider/me/assignments", s)),
       ok(api<unknown>("rider/me/deliveries", s)),
@@ -83,6 +85,7 @@ export function RiderApp({ session }: { session: Session }) {
       ok(api<Wallet>("rider/me/wallet", s)),
       ok(api<unknown>("rider/me/performance", s)),
       ok(api<Cash>("rider/me/cash", s)),
+      ok(Promise.resolve(supabase.from("slot_attendance").select("slot_id,status").eq("rider_id", s.user.id))),
     ]);
     if (rid !== undefined) setRider(rid);
     if (asg !== undefined) {
@@ -98,6 +101,10 @@ export function RiderApp({ session }: { session: Session }) {
     }
     if (del !== undefined) setDeliveries(await enrich(list<Delivery>(del)));
     if (slt !== undefined) setSlots(list<Slot>(slt));
+    if (att?.data) {
+      const rows = att.data as Array<{ slot_id: string; status: string }>;
+      setMine(new Set(rows.filter((x) => x.status !== "cancelled").map((x) => x.slot_id)));
+    }
     if (ear !== undefined) setEarnings(ear);
     if (wal !== undefined) setWallet(wal);
     if (per !== undefined) setPerf(list<Performance>(per));
@@ -124,15 +131,12 @@ export function RiderApp({ session }: { session: Session }) {
     } catch (e) {
       const msg = e instanceof Error ? e.message : "";
       if (msg.includes("ACTIVE_SLOT_REQUIRED")) {
-        Alert.alert(
-          "خاصك Slot فالوقت الحالي",
-          "باش تفعّل Online خاصك Slot محجوز كيغطي الوقت ديال دابا. احجز واحد أو أنشئ واحد جديد.",
-          [{ text: "إلغاء", style: "cancel" }, { text: "فتح Slots", onPress: () => setTab("slots") }]
-        );
-      } else if (msg.includes("RIDER_NOT_APPROVED")) {
-        Alert.alert("حسابك ما تفعّلش", "الإدارة خاصها توافق على حسابك قبل.");
+        Alert.alert("خاصك Slot فالوقت الحالي", friendlyError(msg, ""), [
+          { text: "إلغاء", style: "cancel" },
+          { text: "حجز وقت", onPress: () => setTab("slots") },
+        ]);
       } else {
-        Alert.alert("WASSLHA", msg || "تعذر تغيير الحالة");
+        Alert.alert("WASSLHA", friendlyError(msg, "تعذر تغيير الحالة"));
       }
     }
     await load("poll");
@@ -175,24 +179,30 @@ export function RiderApp({ session }: { session: Session }) {
     }
   }
 
-  async function slotCall(key: string, path: string, init: RequestInit, success: string) {
+  async function slotCall(key: string, run: () => Promise<void>, success: string): Promise<boolean> {
     setSlotBusy(key);
     try {
-      await api(path, session, init);
+      await run();
       notify(success);
-      await load("poll");
       return true;
     } catch (e) {
-      Alert.alert("Slots", e instanceof Error ? e.message : "تعذر تنفيذ العملية");
+      Alert.alert("Slots", friendlyError(e instanceof Error ? e.message : "", "تعذر تنفيذ العملية"));
       return false;
     } finally {
+      await load("poll");
       setSlotBusy(null);
     }
   }
-  const bookSlot = (id: string) => void slotCall(id, `rider-slots/${id}/book`, { method: "POST" }, "تحجز الـSlot ✓");
-  const joinWaitlist = (id: string) => void slotCall(id, `rider-slots/${id}/waitlist`, { method: "POST" }, "تسجلتي فلائحة الانتظار ✓");
-  const createSlot = (f: { slot_date: string; start_time: string; end_time: string; capacity: number }) =>
-    slotCall("create", "rider-slots", { method: "POST", body: JSON.stringify(f) }, "تسجل الـSlot ✓");
+  const bookSlot = (id: string) =>
+    void slotCall(id, async () => { await api(`rider-slots/${id}/book`, session, { method: "POST" }); }, "تحجز الوقت ✓");
+  const joinWaitlist = (id: string) =>
+    void slotCall(id, async () => { await api(`rider-slots/${id}/waitlist`, session, { method: "POST" }); }, "تسجلتي فلائحة الانتظار ✓");
+  // One tap: create my own slot for the chosen day/time, then book it (a created slot is not booked automatically).
+  const quickBook = (f: { slot_date: string; start_time: string; end_time: string }) =>
+    slotCall("quick", async () => {
+      const slot = await api<Slot>("rider-slots", session, { method: "POST", body: JSON.stringify({ ...f, capacity: 1 }) });
+      await api(`rider-slots/${slot.id}/book`, session, { method: "POST" });
+    }, "تحجز الوقت ديالك ✓");
 
   async function signOut() {
     try { await api("rider/me/online", session, { method: "POST", body: JSON.stringify({ is_online: false }) }); } catch { /* offline anyway */ }
@@ -213,7 +223,7 @@ export function RiderApp({ session }: { session: Session }) {
       body = <OrdersScreen rows={history} refreshing={refreshing} onRefresh={refresh} />;
       break;
     case "slots":
-      body = <SlotsScreen slots={slots} busyKey={slotBusy} refreshing={refreshing} onRefresh={refresh} onBook={bookSlot} onWaitlist={joinWaitlist} onCreate={createSlot} />;
+      body = <SlotsScreen slots={slots} mine={mine} busyKey={slotBusy} refreshing={refreshing} onRefresh={refresh} onBook={bookSlot} onWaitlist={joinWaitlist} onQuickBook={quickBook} />;
       break;
     case "earnings":
       body = <EarningsScreen wallet={wallet} cash={cash} earnings={earnings} perf={perf[0] ?? null} refreshing={refreshing} onRefresh={refresh} />;
