@@ -1,4 +1,5 @@
 import { Pressable, StyleSheet, Text, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { C, ROW } from "../theme";
 import type { Tab } from "../lib/types";
 
@@ -11,8 +12,10 @@ const TABS: { key: Tab; icon: string; label: string }[] = [
 ];
 
 export function TabBar({ active, badge, onChange }: { active: Tab; badge: number; onChange: (t: Tab) => void }) {
+  // Android edge-to-edge: keep the bar above the system navigation buttons / gesture area.
+  const insets = useSafeAreaInsets();
   return (
-    <View style={s.bar}>
+    <View style={[s.bar, { paddingBottom: Math.max(insets.bottom, 10) + 4 }]}>
       {TABS.map((t) => (
         <Pressable key={t.key} onPress={() => onChange(t.key)} style={s.item}>
           <View>
@@ -27,7 +30,7 @@ export function TabBar({ active, badge, onChange }: { active: Tab; badge: number
 }
 
 const s = StyleSheet.create({
-  bar: { flexDirection: ROW, backgroundColor: C.card, borderTopWidth: 1, borderTopColor: C.line, paddingBottom: 10, paddingTop: 8 },
+  bar: { flexDirection: ROW, backgroundColor: C.card, borderTopWidth: 1, borderTopColor: C.line, paddingTop: 8 },
   item: { flex: 1, alignItems: "center", gap: 2 },
   icon: { fontSize: 22 },
   label: { fontSize: 11, color: C.muted, fontWeight: "700" },

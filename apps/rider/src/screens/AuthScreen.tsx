@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { StyleSheet, Text, TextInput, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { Session } from "@supabase/supabase-js";
 import { supabase } from "../lib/supabase";
 import { toPhone } from "../lib/format";
@@ -8,6 +9,7 @@ import { Button } from "../components/ui";
 
 // Same phone + SMS code login as the customer app (riders are created by the admin with their phone).
 export function AuthScreen({ onDone }: { onDone: (session: Session) => void }) {
+  const insets = useSafeAreaInsets();
   const [phone, setPhone] = useState("");
   const [code, setCode] = useState("");
   const [sent, setSent] = useState(false);
@@ -36,7 +38,7 @@ export function AuthScreen({ onDone }: { onDone: (session: Session) => void }) {
         <Text style={a.brand}>WASSLHA</Text>
         <Text style={a.tagline}>تطبيق السائق · خدم فبرشيد وربح</Text>
       </View>
-      <View style={a.card}>
+      <View style={[a.card, { paddingBottom: 30 + insets.bottom }]}>
         <Text style={a.title}>{sent ? "دخل الكود" : "مرحبا بالسائق 🛵"}</Text>
         <Text style={a.hint}>{sent ? "صيفطنا ليك كود على التيليفون" : "دخل رقم تيليفونك المسجّل كسائق"}</Text>
         <TextInput
@@ -67,7 +69,7 @@ const a = StyleSheet.create({
   logoText: { fontSize: 46, fontWeight: "900", color: C.primary },
   brand: { color: "#fff", fontSize: 28, fontWeight: "900", marginTop: 14, letterSpacing: 2 },
   tagline: { color: "#FFE0DE", marginTop: 6, textAlign: "center" },
-  card: { backgroundColor: C.bg, borderTopLeftRadius: 30, borderTopRightRadius: 30, padding: 24, paddingBottom: 38 },
+  card: { backgroundColor: C.bg, borderTopLeftRadius: 30, borderTopRightRadius: 30, padding: 24 },
   title: { fontSize: 24, fontWeight: "900", color: C.ink, textAlign: "right" },
   hint: { color: C.muted, marginTop: 4, marginBottom: 10, textAlign: "right" },
   input: { backgroundColor: C.card, borderWidth: 1, borderColor: C.line, borderRadius: 16, paddingHorizontal: 16, paddingVertical: 14, fontSize: 18, color: C.ink, textAlign: "center", letterSpacing: 2, marginVertical: 8 },

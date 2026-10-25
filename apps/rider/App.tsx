@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { ActivityIndicator, StatusBar, StyleSheet, Text, View } from "react-native";
+import { SafeAreaProvider } from "react-native-safe-area-context";
 import type { Session } from "@supabase/supabase-js";
 import "./src/lib/tracking"; // registers the background location task at startup
 import { supabase, supabaseConfigured } from "./src/lib/supabase";
@@ -24,18 +25,20 @@ export default function App() {
   }, []);
 
   return (
-    <View style={{ flex: 1, backgroundColor: C.bg }}>
-      <StatusBar barStyle="dark-content" backgroundColor="transparent" translucent />
-      {!ready ? (
-        <View style={st.center}><ActivityIndicator color={C.primary} size="large" /></View>
-      ) : !supabaseConfigured || !API ? (
-        <View style={st.center}><Text style={{ color: C.danger }}>خص إعداد Supabase و API URL.</Text></View>
-      ) : session ? (
-        <RiderApp session={session} />
-      ) : (
-        <AuthScreen onDone={setSession} />
-      )}
-    </View>
+    <SafeAreaProvider>
+      <View style={{ flex: 1, backgroundColor: C.bg }}>
+        <StatusBar barStyle="dark-content" backgroundColor="transparent" translucent />
+        {!ready ? (
+          <View style={st.center}><ActivityIndicator color={C.primary} size="large" /></View>
+        ) : !supabaseConfigured || !API ? (
+          <View style={st.center}><Text style={{ color: C.danger }}>خص إعداد Supabase و API URL.</Text></View>
+        ) : session ? (
+          <RiderApp session={session} />
+        ) : (
+          <AuthScreen onDone={setSession} />
+        )}
+      </View>
+    </SafeAreaProvider>
   );
 }
 

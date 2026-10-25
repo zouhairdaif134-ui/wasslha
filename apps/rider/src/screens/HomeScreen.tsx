@@ -3,13 +3,14 @@ import { C, ROW } from "../theme";
 import type { Assignment, Cash, Delivery, DeliveryStatus, Earnings, Pos, Rider } from "../lib/types";
 import { money } from "../lib/format";
 import { ActiveDelivery } from "../components/ActiveDelivery";
+import { LiveMap } from "../components/LiveMap";
 import { OfferCard } from "../components/OfferCard";
-import { Card, Empty, Page, Stat, Title } from "../components/ui";
+import { Button, Card, Empty, Page, Stat, Title } from "../components/ui";
 
 export function HomeScreen(p: {
   rider: Rider | null; online: boolean; onToggle: (v: boolean) => void; gps: string; pos: Pos | null;
   active: Delivery | null; offers: { a: Assignment; d?: Delivery }[]; cash: Cash; earnings: Earnings; delivered: number;
-  busyId: string | null; refreshing: boolean; onRefresh: () => void;
+  busyId: string | null; refreshing: boolean; onRefresh: () => void; onOpenSlots: () => void;
   onRespond: (id: string, status: "accepted" | "rejected") => void; onStatus: (status: DeliveryStatus, reason?: string) => void;
 }) {
   return (
@@ -23,10 +24,21 @@ export function HomeScreen(p: {
         <Switch value={p.online} onValueChange={p.onToggle} trackColor={{ false: "#ffffff44", true: C.accent }} thumbColor="#fff" />
       </View>
 
+      {!p.online ? (
+        <Card tone="warn">
+          <Text style={s.tip}>باش تفعّل Online خاصك Slot محجوز فالوقت الحالي. احجز واحد ولا أنشئ واحد جديد.</Text>
+          <Button title="🗓️ فتح Slots" variant="dark" onPress={p.onOpenSlots} />
+        </Card>
+      ) : null}
+
       {p.cash?.blocked ? (
         <Card tone="danger">
           <Text style={s.warn}>وصلتي للحد الأقصى ديال الكاش ({money(p.cash.limit_minor)}). سلّم الكاش للإدارة باش تستقبل طلبات كاش جداد.</Text>
         </Card>
+      ) : null}
+
+      {p.online && !p.active ? (
+        p.pos ? <LiveMap rider={p.pos} pickup={null} customer={null} height={170} /> : <Text style={s.tip}>كنقلبو على موقعك... تأكد أن GPS مفعّل وأن التطبيق مسموح له بالموقع.</Text>
       ) : null}
 
       <View style={{ flexDirection: ROW, gap: 10 }}>
@@ -65,4 +77,5 @@ const s = StyleSheet.create({
   heroTitle: { color: "#fff", fontSize: 24, fontWeight: "900", textAlign: "right", marginTop: 2 },
   heroSub: { color: "#ffffffcc", fontSize: 13, textAlign: "right", marginTop: 2 },
   warn: { color: C.danger, fontWeight: "800", lineHeight: 21, textAlign: "right" },
+  tip: { color: C.ink, lineHeight: 21, textAlign: "right", fontWeight: "700" },
 });
