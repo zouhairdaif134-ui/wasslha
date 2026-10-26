@@ -21,6 +21,10 @@ import { ProfileScreen } from "./screens/ProfileScreen";
 function ok<T>(p: Promise<T>): Promise<T | undefined> {
   return p.catch(() => undefined);
 }
+// Only run the request when `on` is true (the fast poll skips everything except offers/deliveries).
+function when<T>(on: boolean, make: () => Promise<T>): Promise<T | undefined> {
+  return on ? ok(make()) : Promise.resolve(undefined);
+}
 
 // Pickup address/coordinates and the customer note are not in the API payload; they live on the same
 // `deliveries` rows the API reads, so the rider reads them with his own token (RLS applies).
@@ -38,6 +42,8 @@ async function enrich(rows: Delivery[]): Promise<Delivery[]> {
     return rows;
   }
 }
+
+type LoadMode = "initial" | "fast" | "poll" | "manual";
 
 export function RiderApp({ session }: { session: Session }) {
   const [rider, setRider] = useState<Rider | null>(null);
@@ -73,20 +79,23 @@ export function RiderApp({ session }: { session: Session }) {
     setTimeout(() => setToast(""), 2800);
   }
 
-  const load = useCallback(async (mode: "initial" | "poll" | "manual" = "poll") => {
+  // The API allows ~100 requests/minute, so: "fast" = 3 calls (profile, offers, deliveries) every 10 s while online,
+  // "poll" = everything, once a minute.
+  const load = useCallback(async (mode: LoadMode = "poll") => {
     if (mode === "initial") setLoading(true);
     if (mode === "manual") setRefreshing(true);
     const s = sessionRef.current;
+    const full = mode !== "fast";
     const [rid, asg, del, slt, ear, wal, per, csh, att] = await Promise.all([
       ok(api<Rider | null>("rider/me", s)),
       ok(api<unknown>("rider/me/assignments", s)),
       ok(api<unknown>("rider/me/deliveries", s)),
-      ok(api<unknown>("rider-slots", s)),
-      ok(api<Earnings>("rider/me/earnings", s)),
-      ok(api<Wallet>("rider/me/wallet", s)),
-      ok(api<unknown>("rider/me/performance", s)),
-      ok(api<Cash>("rider/me/cash", s)),
-      ok(Promise.resolve(supabase.from("slot_attendance").select("slot_id,status").eq("rider_id", s.user.id))),
+      when(full, () => api<unknown>("rider-slots", s)),
+      when(full, () => api<Earnings>("rider/me/earnings", s)),
+      when(full, () => api<Wallet>("rider/me/wallet", s)),
+      when(full, () => api<unknown>("rider/me/performance", s)),
+      when(full, () => api<Cash>("rider/me/cash", s)),
+      when(full, () => Promise.resolve(supabase.from("slot_attendance").select("slot_id,status").eq("rider_id", s.user.id))),
     ]);
     if (rid !== undefined) setRider(rid);
     if (asg !== undefined) {
@@ -116,9 +125,13 @@ export function RiderApp({ session }: { session: Session }) {
 
   useEffect(() => { void load("initial"); }, [load]);
   useEffect(() => {
-    const t = setInterval(() => void load("poll"), online || active ? 8000 : 30000);
+    const t = setInterval(() => void load("fast"), online || active ? 10000 : 30000);
     return () => clearInterval(t);
   }, [load, online, active?.id]);
+  useEffect(() => {
+    const t = setInterval(() => void load("poll"), 60000);
+    return () => clearInterval(t);
+  }, [load]);
   useEffect(() => {
     const sub = AppState.addEventListener("change", (st) => { if (st === "active") void load("poll"); });
     return () => sub.remove();

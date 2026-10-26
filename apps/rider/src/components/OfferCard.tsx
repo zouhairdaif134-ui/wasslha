@@ -5,7 +5,8 @@ import type { Assignment, Delivery, Pos } from "../lib/types";
 import { distanceKm, kmLabel, money, orderCode, pointOf } from "../lib/format";
 import { Button, Card, Chip, Row } from "./ui";
 
-const OFFER_SECONDS = 60; // same timeout the dispatcher uses before re-offering the order
+// The dispatcher cancels an unanswered offer after 120 seconds (dispatch_auto_assign_pending, p_offer_timeout_seconds).
+const OFFER_SECONDS = 120;
 
 export function OfferCard({ a, d, pos, busy, onRespond }: {
   a: Assignment; d?: Delivery; pos: Pos | null; busy: boolean; onRespond: (id: string, status: "accepted" | "rejected") => void;
@@ -28,7 +29,7 @@ export function OfferCard({ a, d, pos, busy, onRespond }: {
     <Card>
       <Row>
         <Text style={s.code}>{d ? orderCode(d.master_order_id) : "طلب جديد"}</Text>
-        {left != null ? <Chip text={expired ? "انتهى العرض" : `باقي ${left} ث`} tone={expired ? "danger" : left <= 15 ? "danger" : "warn"} /> : <Chip text="عرض جديد" tone="warn" />}
+        {left != null ? <Chip text={expired ? "انتهى العرض" : `باقي ${left} ث`} tone={expired ? "danger" : left <= 20 ? "danger" : "warn"} /> : <Chip text="عرض جديد" tone="warn" />}
       </Row>
       {d ? (
         <>
