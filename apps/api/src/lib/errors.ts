@@ -159,6 +159,32 @@ export function toApiError(
     return error;
   }
 
+  // Routers build errors as plain { code, message, status } objects (their local `fail()` helpers).
+  // Those used to fall through to a generic 500 "An unexpected error occurred", hiding the real
+  // status and message from every client. Keep them as the intended error instead.
+  if (error && typeof error === "object" && !(error instanceof Error)) {
+    const candidate = error as {
+      code?: unknown;
+      message?: unknown;
+      status?: unknown;
+    };
+
+    if (
+      typeof candidate.code === "string" &&
+      typeof candidate.message === "string" &&
+      typeof candidate.status === "number" &&
+      Number.isInteger(candidate.status) &&
+      candidate.status >= 400 &&
+      candidate.status <= 599
+    ) {
+      return new ApiError(
+        candidate.code as ApiErrorCode,
+        candidate.message,
+        candidate.status,
+      );
+    }
+  }
+
   if (error instanceof Error) {
     return internalServerError(
       error.message ||
