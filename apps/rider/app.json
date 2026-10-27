@@ -3,30 +3,26 @@
     "name": "WASSLHA Rider",
     "slug": "wasslha-rider",
     "owner": "wasslhas-team",
-    "version": "0.1.0",
+    "version": "0.2.0",
     "orientation": "portrait",
-    "userInterfaceStyle": "automatic",
+    "userInterfaceStyle": "light",
     "scheme": "wasslha-rider",
     "plugins": [
       [
         "expo-location",
         {
-          "locationWhenInUsePermission": "WASSLHA يحتاج موقعك أثناء الخدمة لتحديث التوصيل وتتبع المسار."
+          "locationWhenInUsePermission": "WASSLHA يحتاج موقعك أثناء الخدمة باش يوصل ليك الطلبات ويتتبع التوصيل.",
+          "locationAlwaysAndWhenInUsePermission": "WASSLHA يحتاج موقعك حتى فاش التطبيق مسدود، باش الزبون يتبع التوصيل.",
+          "isAndroidBackgroundLocationEnabled": true,
+          "isAndroidForegroundServiceEnabled": true,
+          "isIosBackgroundLocationEnabled": true
         }
-      ]
+      ],
+      "./plugins/with-android-build-fixes"
     ],
     "android": {
       "package": "ma.wasslha.rider",
-      "versionCode": 1,
-      "permissions": [
-        "ACCESS_COARSE_LOCATION",
-        "ACCESS_FINE_LOCATION"
-      ]
-    },
-    "ios": {
-      "infoPlist": {
-        "NSLocationWhenInUseUsageDescription": "WASSLHA uses your location while you are online for delivery dispatch and active navigation."
-      }
+      "versionCode": 2
     },
     "extra": {
       "eas": {

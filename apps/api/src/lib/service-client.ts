@@ -22,6 +22,17 @@ export interface ServiceResult<T> {
   status: number;
 }
 
+// Database functions signal business errors with `raise exception 'SOME_CODE'` (optionally 'SOME_CODE:<uuid>').
+// PostgREST returns that as { message: "SOME_CODE" }. Only such codes are copied into the error text, so callers can
+// map them (e.g. error.includes("NO_ELIGIBLE_RIDER")) while internal details (tables, columns, SQL) stay hidden.
+function businessCode(data: unknown): string | null {
+  if (!data || typeof data !== "object" || Array.isArray(data)) return null;
+  const message = (data as { message?: unknown }).message;
+  if (typeof message !== "string") return null;
+  const match = /^([A-Z][A-Z0-9_]{2,60})(?::[0-9a-fA-F-]{36})?$/.exec(message);
+  return match ? match[1] : null;
+}
+
 export async function serviceRequest<T>(
   path: string,
   env: ServiceAuthEnv,
@@ -63,9 +74,10 @@ export async function serviceRequest<T>(
     }
 
     if (!response.ok) {
+      const code = businessCode(data);
       return {
         data,
-        error: `Supabase service request failed with status ${response.status}`,
+        error: `Supabase service request failed with status ${response.status}${code ? `: ${code}` : ""}`,
         status: response.status,
       };
     }
