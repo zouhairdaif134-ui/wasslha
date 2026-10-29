@@ -4,7 +4,29 @@ export interface DispatchJobEnv extends ServiceAuthEnv {
   ENVIRONMENT: string;
 }
 
+// A rider whose app stopped reporting a position for this long is no longer "online".
+const STALE_ONLINE_MINUTES = 10;
+
 export async function runDispatchJob(env: DispatchJobEnv): Promise<void> {
+  // Independent of dispatch: never let a failure here block order dispatching below.
+  const expired = await servicePost<number>(
+    "/rest/v1/rpc/rider_expire_stale_online",
+    env,
+    { p_stale_minutes: STALE_ONLINE_MINUTES },
+  );
+
+  if (expired.error) {
+    console.error("WASSLHA stale rider cleanup failed", {
+      environment: env.ENVIRONMENT,
+      error: expired.error,
+    });
+  } else if (typeof expired.data === "number" && expired.data > 0) {
+    console.log("WASSLHA riders set offline (no position reported)", {
+      environment: env.ENVIRONMENT,
+      riders: expired.data,
+    });
+  }
+
   const result = await servicePost<{ assigned: number; expired_offers: number }>(
     "/rest/v1/rpc/dispatch_auto_assign_pending",
     env,
