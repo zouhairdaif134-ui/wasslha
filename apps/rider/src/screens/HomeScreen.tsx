@@ -1,4 +1,4 @@
-import { StyleSheet, Switch, Text, View } from "react-native";
+import { Linking, StyleSheet, Switch, Text, View } from "react-native";
 import { C, ROW } from "../theme";
 import type { Assignment, Cash, Delivery, DeliveryStatus, Earnings, Pos, Rider } from "../lib/types";
 import { money } from "../lib/format";
@@ -10,7 +10,7 @@ import { Button, Card, Empty, Page, Stat, Title } from "../components/ui";
 export function HomeScreen(p: {
   rider: Rider | null; online: boolean; onToggle: (v: boolean) => void; gps: string; pos: Pos | null;
   active: Delivery | null; offers: { a: Assignment; d?: Delivery }[]; cash: Cash; earnings: Earnings; delivered: number;
-  busyId: string | null; refreshing: boolean; onRefresh: () => void; onOpenSlots: () => void;
+  busyId: string | null; refreshing: boolean; onRefresh: () => void; onOpenSlots: () => void; notifOk: boolean;
   onRespond: (id: string, status: "accepted" | "rejected") => void; onStatus: (status: DeliveryStatus, reason?: string) => void;
 }) {
   return (
@@ -28,6 +28,13 @@ export function HomeScreen(p: {
         <Card tone="warn">
           <Text style={s.tip}>باش تفعّل Online خاصك Slot محجوز فالوقت الحالي. احجز واحد ولا أنشئ واحد جديد.</Text>
           <Button title="🗓️ فتح Slots" variant="dark" onPress={p.onOpenSlots} />
+        </Card>
+      ) : null}
+
+      {p.online && !p.notifOk ? (
+        <Card tone="danger">
+          <Text style={s.warn}>الإشعارات مغلقة. العرض كيسالي فدقيقتين، وما غادي يوصلك تنبيه ملي يجي إلا كان التطبيق مسدود. فعّلها من إعدادات التطبيق.</Text>
+          <Button title="فتح إعدادات التطبيق" variant="dark" onPress={() => void Linking.openSettings()} />
         </Card>
       ) : null}
 
@@ -62,7 +69,7 @@ export function HomeScreen(p: {
             <Empty
               icon={p.online ? "🛵" : "😴"}
               title={p.online ? "ما كاين حتى عرض دابا" : "أنت غير متصل"}
-              text={p.online ? "بقا فالتطبيق مفتوح، غيهز ليك التيليفون ملي يوصل طلب." : "فعّل Online من المفتاح فاللول باش تبدا."}
+              text={p.online ? "غيهز ليك التيليفون ملي يوصل طلب، حتى والتطبيق مسدود." : "فعّل Online من المفتاح فاللول باش تبدا."}
             />
           ) : null}
         </>

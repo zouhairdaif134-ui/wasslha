@@ -5,7 +5,8 @@ import { supabase } from "./lib/supabase";
 import { api, list } from "./lib/http";
 import { friendlyError } from "./lib/errors";
 import { FINISHED } from "./lib/format";
-import { getVibrate } from "./lib/prefs";
+import { getNotified, getVibrate, markNotified } from "./lib/prefs";
+import { notificationsAllowed, requestNotifications } from "./lib/notify";
 import { stopBackground } from "./lib/tracking";
 import { useLiveLocation } from "./lib/useLiveLocation";
 import type { Assignment, Cash, Delivery, DeliveryStatus, Earnings, Performance, Rider, Slot, Tab, Wallet } from "./lib/types";
@@ -61,10 +62,10 @@ export function RiderApp({ session }: { session: Session }) {
   const [busy, setBusy] = useState<string | null>(null);
   const [slotBusy, setSlotBusy] = useState<string | null>(null);
   const [toast, setToast] = useState("");
+  const [notifOk, setNotifOk] = useState(true);
 
   const sessionRef = useRef(session);
   sessionRef.current = session;
-  const seenOffers = useRef<Set<string> | null>(null);
 
   const deliveryMap = useMemo(() => new Map(deliveries.map((d) => [d.id, d])), [deliveries]);
   const unfinished = (a: Assignment) => !FINISHED.includes(deliveryMap.get(a.delivery_id)?.status ?? "");
@@ -78,6 +79,7 @@ export function RiderApp({ session }: { session: Session }) {
     setToast(text);
     setTimeout(() => setToast(""), 2800);
   }
+  const checkNotifications = useCallback(async () => { setNotifOk(await notificationsAllowed()); }, []);
 
   // The API allows ~100 requests/minute, so: "fast" = 3 calls (profile, offers, deliveries) every 10 s while online,
   // "poll" = everything, once a minute.
@@ -101,13 +103,15 @@ export function RiderApp({ session }: { session: Session }) {
     if (asg !== undefined) {
       const rows = list<Assignment>(asg);
       setAssignments(rows);
+      // Alert once per offer: the background notification marks the same ids, so nothing rings twice.
       const offeredNow = rows.filter((x) => x.status === "offered").map((x) => x.id);
-      const seen = seenOffers.current;
-      if (seen && offeredNow.some((id) => !seen.has(id))) {
+      const known = await getNotified();
+      const fresh = offeredNow.filter((id) => !known.has(id));
+      if (fresh.length > 0) {
+        await markNotified(fresh);
         if (await getVibrate()) Vibration.vibrate([0, 500, 250, 500]);
         notify("عرض جديد! 🛵");
       }
-      seenOffers.current = new Set(offeredNow);
     }
     if (del !== undefined) setDeliveries(await enrich(list<Delivery>(del)));
     if (slt !== undefined) setSlots(list<Slot>(slt));
@@ -123,7 +127,7 @@ export function RiderApp({ session }: { session: Session }) {
     setRefreshing(false);
   }, []);
 
-  useEffect(() => { void load("initial"); }, [load]);
+  useEffect(() => { void load("initial"); void checkNotifications(); }, [load, checkNotifications]);
   useEffect(() => {
     const t = setInterval(() => void load("fast"), online || active ? 10000 : 30000);
     return () => clearInterval(t);
@@ -133,15 +137,19 @@ export function RiderApp({ session }: { session: Session }) {
     return () => clearInterval(t);
   }, [load]);
   useEffect(() => {
-    const sub = AppState.addEventListener("change", (st) => { if (st === "active") void load("poll"); });
+    const sub = AppState.addEventListener("change", (st) => {
+      if (st === "active") { void load("poll"); void checkNotifications(); }
+    });
     return () => sub.remove();
-  }, [load]);
+  }, [load, checkNotifications]);
 
   /* ── actions ── */
   async function setOnline(value: boolean) {
     setRider((r) => (r ? { ...r, is_online: value } : r));
     try {
       await api("rider/me/online", session, { method: "POST", body: JSON.stringify({ is_online: value }) });
+      // Ask for notification permission when the rider actually starts working (Android 13+ shows a dialog).
+      if (value) { await requestNotifications(); await checkNotifications(); }
     } catch (e) {
       const msg = e instanceof Error ? e.message : "";
       if (msg.includes("ACTIVE_SLOT_REQUIRED")) {
@@ -250,7 +258,7 @@ export function RiderApp({ session }: { session: Session }) {
         <HomeScreen
           rider={rider} online={online} onToggle={(v) => void setOnline(v)} gps={gps} pos={pos} active={active} offers={offers}
           cash={cash} earnings={earnings} delivered={deliveries.filter((d) => d.status === "delivered").length}
-          busyId={busy} refreshing={refreshing} onRefresh={refresh} onOpenSlots={() => setTab("slots")}
+          busyId={busy} refreshing={refreshing} onRefresh={refresh} onOpenSlots={() => setTab("slots")} notifOk={notifOk}
           onRespond={respond} onStatus={(s, r) => void transition(s, r)}
         />
       );
