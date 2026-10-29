@@ -3,6 +3,8 @@ import * as Location from "expo-location";
 import * as TaskManager from "expo-task-manager";
 import { supabase } from "./supabase";
 import { API } from "./http";
+import { getNotified, markNotified } from "./prefs";
+import { notifyNewOffer } from "./notify";
 
 export const LOCATION_TASK = "wasslha-rider-live-location";
 export const ACTIVE_DELIVERY_KEY = "wasslha:rider:active-delivery";
@@ -29,13 +31,34 @@ export async function postLocation(token: string, deliveryId: string | null, c: 
   } catch { /* offline: the next update retries */ }
 }
 
-// Runs even when the app is closed (Android foreground service) once background permission is granted.
+// Runs every ~10 s while the foreground service is alive, even with the app closed or in the background.
+// Piggybacks on it to look for new offers and ring a local notification (offers expire after 120 s).
+async function notifyOffers(token: string): Promise<void> {
+  if (!API) return;
+  try {
+    const response = await fetch(`${API}/api/v1/rider/me/assignments`, {
+      headers: { Accept: "application/json", Authorization: `Bearer ${token}` },
+    });
+    if (!response.ok) return;
+    const payload = (await response.json()) as { data?: unknown };
+    const rows = Array.isArray(payload.data) ? (payload.data as Array<{ id: string; status?: string | null; offered_at?: string | null }>) : [];
+    const live = rows.filter((x) => x.status === "offered" && (!x.offered_at || Date.now() - Date.parse(x.offered_at) < 150000));
+    if (live.length === 0) return;
+    const known = await getNotified();
+    const fresh = live.filter((x) => !known.has(x.id));
+    if (fresh.length === 0) return;
+    await markNotified(fresh.map((x) => x.id));
+    await notifyNewOffer(fresh.length);
+  } catch { /* try again on the next update */ }
+}
+
 TaskManager.defineTask<{ locations: Location.LocationObject[] }>(LOCATION_TASK, async ({ data, error }) => {
   if (error || !data?.locations?.length) return;
   const { data: s } = await supabase.auth.getSession();
   if (!s.session) return;
   const deliveryId = await AsyncStorage.getItem(ACTIVE_DELIVERY_KEY);
   await postLocation(s.session.access_token, deliveryId || null, data.locations[data.locations.length - 1].coords);
+  await notifyOffers(s.session.access_token);
 });
 
 export async function startBackground(): Promise<boolean> {

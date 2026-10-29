@@ -3,7 +3,7 @@
     "name": "WASSLHA Rider",
     "slug": "wasslha-rider",
     "owner": "wasslhas-team",
-    "version": "0.2.0",
+    "version": "0.3.0",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
     "scheme": "wasslha-rider",
@@ -18,11 +18,22 @@
           "isIosBackgroundLocationEnabled": true
         }
       ],
+      [
+        "expo-notifications",
+        {
+          "color": "#E53935",
+          "defaultChannel": "wasslha-offers"
+        }
+      ],
       "./plugins/with-android-build-fixes"
     ],
     "android": {
       "package": "ma.wasslha.rider",
-      "versionCode": 2
+      "versionCode": 3,
+      "permissions": [
+        "POST_NOTIFICATIONS",
+        "VIBRATE"
+      ]
     },
     "extra": {
       "eas": {
