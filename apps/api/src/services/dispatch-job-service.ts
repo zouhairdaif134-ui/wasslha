@@ -7,8 +7,8 @@ export interface DispatchJobEnv extends ServiceAuthEnv {
 // A rider whose app stopped reporting a position for this long is no longer "online".
 const STALE_ONLINE_MINUTES = 10;
 
-export async function runDispatchJob(env: DispatchJobEnv): Promise<void> {
-  // Independent of dispatch: never let a failure here block order dispatching below.
+// Housekeeping that must never block dispatching: a failure here is logged and the job goes on.
+async function housekeeping(env: DispatchJobEnv): Promise<void> {
   const expired = await servicePost<number>(
     "/rest/v1/rpc/rider_expire_stale_online",
     env,
@@ -26,6 +26,30 @@ export async function runDispatchJob(env: DispatchJobEnv): Promise<void> {
       riders: expired.data,
     });
   }
+
+  // Cancels orders the merchant never confirmed (disabled while
+  // admin_settings marketplace.merchant_confirmation_timeout_minutes = 0).
+  const unconfirmed = await servicePost<number>(
+    "/rest/v1/rpc/expire_unconfirmed_sub_orders",
+    env,
+    {},
+  );
+
+  if (unconfirmed.error) {
+    console.error("WASSLHA unconfirmed order cleanup failed", {
+      environment: env.ENVIRONMENT,
+      error: unconfirmed.error,
+    });
+  } else if (typeof unconfirmed.data === "number" && unconfirmed.data > 0) {
+    console.log("WASSLHA unconfirmed orders cancelled (merchant did not respond)", {
+      environment: env.ENVIRONMENT,
+      orders: unconfirmed.data,
+    });
+  }
+}
+
+export async function runDispatchJob(env: DispatchJobEnv): Promise<void> {
+  await housekeeping(env);
 
   const result = await servicePost<{ assigned: number; expired_offers: number }>(
     "/rest/v1/rpc/dispatch_auto_assign_pending",
