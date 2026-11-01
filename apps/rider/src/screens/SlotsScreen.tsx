@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
 import { C, ROW } from "../theme";
 import type { Slot } from "../lib/types";
 import { Button, Card, Chip, Empty, Page, Row, Title } from "../components/ui";
@@ -41,6 +41,16 @@ export function SlotsScreen({ slots, mine, busyKey, refreshing, onRefresh, onBoo
   const valid = to > from;
   const day = days[dayIdx];
 
+  // A slot with the same day and hours may already exist (the database allows one per rider): reuse it
+  // instead of creating a duplicate, which the server rejects with a 409.
+  function bookChosen() {
+    const f = { slot_date: isoDate(day), start_time: hhmm(from), end_time: hhmm(to) };
+    const same = slots.find((x) => x.slot_date === f.slot_date && x.start_time.slice(0, 5) === f.start_time && x.end_time.slice(0, 5) === f.end_time);
+    if (same && mine.has(same.id)) { Alert.alert("Slots", "هاد الوقت محجوز عندك أصلا ✓ فعّل Online من الرئيسية."); return; }
+    if (same) { onBook(same.id); return; }
+    void onQuickBook(f);
+  }
+
   return (
     <Page refreshing={refreshing} onRefresh={onRefresh}>
       <Title text="حجز وقت الخدمة" />
@@ -78,7 +88,7 @@ export function SlotsScreen({ slots, mine, busyKey, refreshing, onRefresh, onBoo
         <Button
           title={busyKey === "quick" ? "..." : "✅ احجز هاد الوقت"}
           disabled={!valid || busyKey !== null}
-          onPress={() => void onQuickBook({ slot_date: isoDate(day), start_time: hhmm(from), end_time: hhmm(to) })}
+          onPress={bookChosen}
         />
       </Card>
 

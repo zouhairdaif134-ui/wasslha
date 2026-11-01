@@ -25,11 +25,13 @@ export interface ServiceResult<T> {
 // Database functions signal business errors with `raise exception 'SOME_CODE'` (optionally 'SOME_CODE:<uuid>').
 // PostgREST returns that as { message: "SOME_CODE" }. Only such codes are copied into the error text, so callers can
 // map them (e.g. error.includes("NO_ELIGIBLE_RIDER")) while internal details (tables, columns, SQL) stay hidden.
+// A PostgreSQL unique violation (23505) is reported as DUPLICATE_RECORD without exposing the constraint name.
 function businessCode(data: unknown): string | null {
   if (!data || typeof data !== "object" || Array.isArray(data)) return null;
-  const message = (data as { message?: unknown }).message;
-  if (typeof message !== "string") return null;
-  const match = /^([A-Z][A-Z0-9_]{2,60})(?::[0-9a-fA-F-]{36})?$/.exec(message);
+  const body = data as { message?: unknown; code?: unknown };
+  if (body.code === "23505") return "DUPLICATE_RECORD";
+  if (typeof body.message !== "string") return null;
+  const match = /^([A-Z][A-Z0-9_]{2,60})(?::[0-9a-fA-F-]{36})?$/.exec(body.message);
   return match ? match[1] : null;
 }
 
