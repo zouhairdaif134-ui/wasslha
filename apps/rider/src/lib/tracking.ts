@@ -13,12 +13,23 @@ export const ACTIVE_DELIVERY_KEY = "wasslha:rider:active-delivery";
 const clean = (v: number | null | undefined, min: number, max: number) =>
   v != null && Number.isFinite(v) && v >= min && v <= max ? v : null;
 
+// The token handed in can be stale (phone asleep for more than an hour): getSession() renews it first, otherwise the
+// position is rejected with 401, silently, and dispatch sees a rider that stopped reporting.
+async function freshToken(fallback: string): Promise<string> {
+  try {
+    const { data } = await supabase.auth.getSession();
+    return data.session?.access_token ?? fallback;
+  } catch {
+    return fallback;
+  }
+}
+
 export async function postLocation(token: string, deliveryId: string | null, c: Location.LocationObjectCoords) {
   if (!API) return;
   try {
     await fetch(`${API}/api/v1/rider/me/location`, {
       method: "POST",
-      headers: { Accept: "application/json", "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      headers: { Accept: "application/json", "Content-Type": "application/json", Authorization: `Bearer ${await freshToken(token)}` },
       body: JSON.stringify({
         delivery_id: deliveryId,
         latitude: c.latitude,
